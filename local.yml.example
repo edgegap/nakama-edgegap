@@ -1,0 +1,17 @@
+console:
+  max_message_size_bytes: 409600
+logger:
+  level: "DEBUG"
+session:
+  token_expiry_sec: 7200 # 2 hours
+socket:
+  max_message_size_bytes: 4096 # reserved buffer
+  max_request_size_bytes: 131072
+runtime:
+  env:
+    - "EDGEGAP_API_URL=https://api.edgegap.com"
+    - "EDGEGAP_API_TOKEN=token changeme"
+    - "EDGEGAP_APPLICATION=nakama"
+    - "EDGEGAP_VERSION=sample"
+    - "EDGEGAP_PORT_NAME=game"
+    - "NAKAMA_ACCESS_URL=https://changeme.nakamacloud.io"
