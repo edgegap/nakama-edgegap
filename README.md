@@ -1,23 +1,12 @@
 # Nakama <> Edgegap Integration
 
-## Concept
+Deploy dedicated game engine servers for popular engines (e.g., Unity, Unreal, etc.) or custom engine servers, fully integrated with Nakama's open-source player data and game services for a convenient turnkey solution.
 
-Using the Nakama's Storage Index and basic struct Instance Info,
-we store extra information in the metadata for Edgegap using 2 list.
-1 list to holds seats reservations
-1 list to holds active connections
+## Edgegap Setup
 
-Using Max Players field we can now create the field `AvailableSeats` that will be in sync with that (
-MaxPlayers-Reservations-Connections=AvailableSeats)
-
-## Setup
-
-TODO 
-
-- Containerize Game
-- Create Edgegap's Account
-- Create Application and Version
-- Create API Token
+To prepare your dedicated game server build for deployment on Edgegap, see:
+- [Getting Started with Servers (Unity)](https://docs.edgegap.com/learn/unity-games/getting-started-with-servers)
+- [Getting Started with Servers (Unreal Engine)](https://docs.edgegap.com/learn/unreal-engine-games/getting-started-with-servers)
 
 ## Nakama Setup
 
@@ -32,21 +21,26 @@ You must set up the following Environment Variable inside your Nakama's cluster:
 
 You can copy the `local.yml.example` to `local.yml` and fill it out to start with your local cluster
 
-## Authentication
+Using the Nakama's Storage Index and basic struct Instance Info,
+we store extra information in the metadata for Edgegap using 2 list.
+1 list to holds seats reservations
+1 list to holds active connections
 
-Edgegap's API handle IPs to determine the best possible locations for the players, to allow the Game Client's IP to
-be retrieved, some methods are offered to simplify the integration.
+Using Max Players field we can now create the field `AvailableSeats` that will be in sync with that (
+MaxPlayers-Reservations-Connections=AvailableSeats)
+
+## Server Placement
+
+Game clients only interact with Edgegap APIs through Nakama RPCs, defaulting to [Nakama authentication method of your choice](https://heroiclabs.com/docs/nakama/concepts/authentication/). [Edgegap's Server Placement utilizing Server Score strategy](https://docs.edgegap.com/learn/advanced-features/deployments#1-server-score-strategy-best-practice) uses public IP addresses of participating players to choose the optimal server location. To store the player IP address and pass it to Edgegap when looking for server, store player's public IP in their Profile's Metadata as `PlayerIP`.
 
 In your `main.go`, during the Init you can add the Registration of the Authentication of the type you implemented
 
 ```go
     // Register Authentication Methods
-if err := initializer.RegisterAfterAuthenticateCustom(fleetmanager.OnAuthenticateUpdateCustom); err != nil {
-return err
-}
+    if err := initializer.RegisterAfterAuthenticateCustom(fleetmanager.OnAuthenticateUpdateCustom); err != nil {
+        return err
+    }
 ```
-
-This will automatically store in Profile's Metadata the `PlayerIP`
 
 ## Game Server -> Nakama
 
