@@ -11,6 +11,7 @@ import (
 func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, initializer runtime.Initializer) error {
 	initStart := time.Now()
 
+	// Register the Fleet Manager
 	efm, err := fleetmanager.NewEdgegapFleetManager(ctx, logger, db, nk, initializer)
 	if err != nil {
 		return err
@@ -21,6 +22,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 		return err
 	}
 
+	// Register Authentication Methods
 	if err := initializer.RegisterAfterAuthenticateCustom(fleetmanager.OnAuthenticateUpdateCustom); err != nil {
 		return err
 	}

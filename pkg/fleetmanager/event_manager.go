@@ -32,6 +32,8 @@ type EdgegapEventManager struct {
 	sm     *StorageManager
 }
 
+// unpack extracts headers and query parameters from the context
+// and returns an EventMessage struct containing them along with the payload.
 func (eem *EdgegapEventManager) unpack(ctx context.Context, payload string) (*EventMessage, error) {
 	headers, ok := ctx.Value(runtime.RUNTIME_CTX_HEADERS).(map[string][]string)
 	if !ok {
@@ -50,12 +52,15 @@ func (eem *EdgegapEventManager) unpack(ctx context.Context, payload string) (*Ev
 	}, nil
 }
 
+// handleDeploymentEvent processes deployment-related events.
+// It extracts the payload, updates the game session status, and logs errors if necessary.
 func (eem *EdgegapEventManager) handleDeploymentEvent(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	logger.Info("Handle Deployment")
 	msg, err := eem.unpack(ctx, payload)
 	if err != nil {
 		return "", err
 	}
+
 	var deployment EdgegapDeploymentStatus
 	if err := json.Unmarshal([]byte(msg.payload), &deployment); err != nil {
 		return "", err
@@ -94,7 +99,7 @@ func (eem *EdgegapEventManager) handleDeploymentEvent(ctx context.Context, logge
 		if err != nil {
 			return "", err
 		}
-		fmInstance.callbackHandler.InvokeCallback(ei.CallbackId, runtime.CreateError, nil, nil, nil, errors.New("an error occur with edgegap deployment"))
+		fmInstance.callbackHandler.InvokeCallback(ei.CallbackId, runtime.CreateError, nil, nil, nil, errors.New("an error occurred with edgegap deployment"))
 	}
 
 	err = eem.sm.updateDbGameSession(ctx, instance)
@@ -105,6 +110,8 @@ func (eem *EdgegapEventManager) handleDeploymentEvent(ctx context.Context, logge
 	return "ok", nil
 }
 
+// handleConnectionEvent processes connection-related events.
+// It updates the game session's connection and reservation metadata.
 func (eem *EdgegapEventManager) handleConnectionEvent(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	msg, err := eem.unpack(ctx, payload)
 	if err != nil {
@@ -130,6 +137,7 @@ func (eem *EdgegapEventManager) handleConnectionEvent(ctx context.Context, logge
 		return "", err
 	}
 
+	// We want to move all reservations present in the Connections List
 	newReservations := helpers.RemoveElements(edgegapInstance.Reservations, connectionEvent.Connections)
 	edgegapInstance.Reservations = newReservations
 	edgegapInstance.Connections = connectionEvent.Connections
@@ -143,6 +151,8 @@ func (eem *EdgegapEventManager) handleConnectionEvent(ctx context.Context, logge
 	return "ok", nil
 }
 
+// handleGameEvent processes game state change events.
+// It updates the game session's status based on the event action.
 func (eem *EdgegapEventManager) handleGameEvent(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	msg, err := eem.unpack(ctx, payload)
 	if err != nil {
@@ -169,6 +179,8 @@ func (eem *EdgegapEventManager) handleGameEvent(ctx context.Context, logger runt
 	case GameEventStateReady:
 		logger.Info("Edgegap game ready id=%s : %s", gameEvent.GameId, gameEvent.Message)
 		instance.Status = EdgegapStatusReady
+
+		// Extract new Metadata coming from the Game Server and merge it with current
 		instance.Metadata = helpers.MergeMaps(instance.Metadata, gameEvent.Metadata)
 
 		ei, err := eem.sm.ExtractEdgegapInstance(instance)
@@ -183,7 +195,7 @@ func (eem *EdgegapEventManager) handleGameEvent(ctx context.Context, logger runt
 		stopping = true
 
 	case GameEventStateError:
-		logger.Error("Edgegap game State error #%s: %s", gameEvent.GameId, gameEvent.Message)
+		logger.Error("Edgegap game state error #%s: %s", gameEvent.GameId, gameEvent.Message)
 		instance.Status = EdgegapStatusError
 
 	default:

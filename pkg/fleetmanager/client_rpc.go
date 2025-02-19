@@ -51,6 +51,7 @@ type gameCreateReply struct {
 	Ok      bool   `json:"ok"`
 }
 
+// createGameSession client rpc to create a game
 func createGameSession(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	userId, ok := ctx.Value(runtime.RUNTIME_CTX_USER_ID).(string)
 	if !ok {
@@ -136,6 +137,7 @@ func createGameSession(ctx context.Context, logger runtime.Logger, db *sql.DB, n
 	return string(replyString), err
 }
 
+// getGameSession client rpc to retrieve the instance info of a game
 func getGameSession(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	var req *getGameSessionRequest
 	if err := json.Unmarshal([]byte(payload), &req); err != nil {
@@ -158,6 +160,7 @@ func getGameSession(ctx context.Context, logger runtime.Logger, db *sql.DB, nk r
 	return string(replyString), nil
 }
 
+// joinGameSession client rpc to join a game with seats reservations
 func joinGameSession(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	userId, ok := ctx.Value(runtime.RUNTIME_CTX_USER_ID).(string)
 	if !ok {
@@ -189,8 +192,11 @@ func joinGameSession(ctx context.Context, logger runtime.Logger, db *sql.DB, nk 
 	return string(replyString), nil
 }
 
+// listGameSession client rpc to list games with query
+// Example to list all ready games with at least 1 available seat
+// query="+value.metadata.edgegap.available_seats:>=1 +value.status:READY"
 func listGameSession(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
-	// value.metadata.edgegap.available_seats:>0
+
 	var req *findGameSessionRequest
 	if payload != "" {
 		if err := json.Unmarshal([]byte(payload), &req); err != nil {

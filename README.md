@@ -7,16 +7,50 @@ we store extra information in the metadata for Edgegap using 2 list.
 1 list to holds seats reservations
 1 list to holds active connections
 
-Using Max Players field we can now create the field `AvailableSeats` that will be in sync with that (MaxPlayers-Reservations-Connections=AvailableSeats)
+Using Max Players field we can now create the field `AvailableSeats` that will be in sync with that (
+MaxPlayers-Reservations-Connections=AvailableSeats)
 
 ## Setup
+
+TODO 
 
 - Containerize Game
 - Create Edgegap's Account
 - Create Application and Version
 - Create API Token
 
+## Nakama Setup
+
+You must set up the following Environment Variable inside your Nakama's cluster:
+
+- EDGEGAP_API_URL=https://api.edgegap.com
+- EDGEGAP_API_TOKEN=<The Edgegap's API Token (keep the 'token' in the API Token)
+- EDGEGAP_APPLICATION=<The Edgegap's Application Name to use to deploy>
+- EDGEGAP_VERSION=<The Edgegap's Version Name to use to deploy>
+- EDGEGAP_PORT_NAME=<The Edgegap's Application Port Name to send to game client>
+- NAKAMA_ACCESS_URL=<Nakama API Url, for Heroic Cloud, it will be provided when you create your instance>
+
+You can copy the `local.yml.example` to `local.yml` and fill it out to start with your local cluster
+
+## Authentication
+
+Edgegap's API handle IPs to determine the best possible locations for the players, to allow the Game Client's IP to
+be retrieved, some methods are offered to simplify the integration.
+
+In your `main.go`, during the Init you can add the Registration of the Authentication of the type you implemented
+
+```go
+    // Register Authentication Methods
+if err := initializer.RegisterAfterAuthenticateCustom(fleetmanager.OnAuthenticateUpdateCustom); err != nil {
+return err
+}
+```
+
+This will automatically store in Profile's Metadata the `PlayerIP`
+
 ## Game Server -> Nakama
+
+TODO
 
 ### Injected Environment Variables
 
@@ -70,6 +104,8 @@ The field `metadata` will be merged to the metadata of the instance info (game)
 
 ## Game Client -> Nakama (optional rpc)
 
+TODO 
+
 ### Create Game
 
 RPC - game_create
@@ -92,7 +128,7 @@ RPC - game_get
 
 ```json
 {
-  "game_id":"<game_id>"
+  "game_id": "<game_id>"
 }
 ```
 
@@ -102,9 +138,9 @@ RPC - game_list
 
 ```json
 {
-    "query": "",
-    "limit": 100,
-    "cursor": ""
+  "query": "",
+  "limit": 100,
+  "cursor": ""
 }
 ```
 
@@ -114,9 +150,9 @@ Example to list all games READY with at least 1 seat available
 
 ```json
 {
-    "query": "+value.metadata.edgegap.available_seats:>=1 +value.status:READY",
-    "limit": 100,
-    "cursor": ""
+  "query": "+value.metadata.edgegap.available_seats:>=1 +value.status:READY",
+  "limit": 100,
+  "cursor": ""
 }
 
 ```
@@ -133,3 +169,8 @@ RPC - game_join
 ```
 
 if `user_ids` is empty, the user's ID calling this will be used
+
+
+## Matchmaker
+
+TODO

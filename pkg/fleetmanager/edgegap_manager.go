@@ -18,25 +18,29 @@ type EdgegapManager struct {
 	logger        runtime.Logger
 }
 
+// NewEdgegapManager initializes a new EdgegapManager instance.
+// It retrieves the configuration from environment variables, sets up API access,
+// and registers necessary RPC functions.
 func NewEdgegapManager(ctx context.Context, logger runtime.Logger, initializer runtime.Initializer, sm *StorageManager) (*EdgegapManager, error) {
-	// Get the Configuration from the Environment Variables
+	// Get the Configuration from Environment Variables
 	configuration, err := NewEdgegapManagerConfiguration(ctx)
 	if err != nil {
 		return nil, err
 	}
 
+	// Retrieve Nakama configuration
 	config, err := initializer.GetConfig()
 	if err != nil {
 		return nil, err
 	}
-	httpKey := config.GetRuntime().GetHTTPKey()
-	configuration.NakamaHttpKey = httpKey
+	configuration.NakamaHttpKey = config.GetRuntime().GetHTTPKey()
 
 	eem := &EdgegapEventManager{
 		config: configuration,
 		sm:     sm,
 	}
 
+	// Register RPC functions for handling various events
 	rpcToRegisters := map[string]func(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error){
 		RpcIdEventDeployment:   eem.handleDeploymentEvent,
 		RpcIdEventConnection:   eem.handleConnectionEvent,
@@ -47,6 +51,7 @@ func NewEdgegapManager(ctx context.Context, logger runtime.Logger, initializer r
 		RpcIdGameSessionList:   listGameSession,
 	}
 
+	// Register each RPC function with the Nakama runtime
 	for rpcId, function := range rpcToRegisters {
 		err = initializer.RegisterRpc(rpcId, function)
 		if err != nil {
@@ -61,22 +66,27 @@ func NewEdgegapManager(ctx context.Context, logger runtime.Logger, initializer r
 	}, nil
 }
 
+// getFormattedUrl constructs a formatted URL for Nakama API callbacks.
 func (em *EdgegapManager) getFormattedUrl(path string) string {
 	return fmt.Sprintf("%s/v2/rpc/%s?http_key=%s&unwrap", em.configuration.NakamaAccessUrl, path, em.configuration.NakamaHttpKey)
 }
 
+// CreateDeployment initiates a new deployment on Edgegap using the given users' IP addresses and metadata.
 func (em *EdgegapManager) CreateDeployment(usersIP []string, metadata map[string]any) (*EdgegapBetaDeployment, error) {
+	// Prepare deployment data
 	deployment, err := em.getDeploymentCreation(usersIP, metadata)
 	if err != nil {
 		return nil, err
 	}
 
+	// Send deployment request to Edgegap API
 	reply, err := em.apiHelper.Post("/beta/deployments", deployment)
 	if err != nil {
 		return nil, err
 	}
 	defer reply.Body.Close()
 
+	// Check if request was accepted
 	if reply.StatusCode != http.StatusAccepted {
 		body, err := io.ReadAll(reply.Body)
 		if err != nil {
@@ -87,9 +97,10 @@ func (em *EdgegapManager) CreateDeployment(usersIP []string, metadata map[string
 		if err != nil {
 			return nil, err
 		}
-
 		return &msg, errors.New("could not create deployment")
 	}
+
+	// Parse the response body
 	body, err := io.ReadAll(reply.Body)
 	if err != nil {
 		return nil, err
@@ -101,20 +112,24 @@ func (em *EdgegapManager) CreateDeployment(usersIP []string, metadata map[string
 	return &response, err
 }
 
+// getDeploymentCreation prepares the deployment payload, including metadata and environment variables.
 func (em *EdgegapManager) getDeploymentCreation(usersIP []string, metadata map[string]any) (*EdgegapDeploymentCreation, error) {
 	var users []EdgegapDeploymentUser
 
+	// Convert user IPs into EdgegapDeploymentUser objects
 	for _, ip := range usersIP {
 		users = append(users, EdgegapDeploymentUser{
 			IpAddress: ip,
 		})
 	}
 
+	// Marshal metadata into JSON format
 	metadataValue, err := json.Marshal(metadata)
 	if err != nil {
 		return nil, err
 	}
 
+	// Construct deployment request payload
 	return &EdgegapDeploymentCreation{
 		ApplicationName: em.configuration.Application,
 		Version:         em.configuration.Version,
@@ -145,13 +160,16 @@ func (em *EdgegapManager) getDeploymentCreation(usersIP []string, metadata map[s
 	}, nil
 }
 
+// StopDeployment sends a request to stop an active deployment on Edgegap.
 func (em *EdgegapManager) StopDeployment(requestID string) (*EdgegapApiMessage, error) {
+	// Send stop request to Edgegap API
 	reply, err := em.apiHelper.Delete("/v1/stop/" + requestID)
 	if err != nil {
 		return nil, err
 	}
 	defer reply.Body.Close()
 
+	// Check if request was successful
 	if reply.StatusCode == http.StatusOK || reply.StatusCode == http.StatusAccepted {
 		body, err := io.ReadAll(reply.Body)
 		if err != nil {
