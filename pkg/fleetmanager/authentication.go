@@ -3,6 +3,7 @@ package fleetmanager
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"github.com/heroiclabs/nakama-common/api"
 	"github.com/heroiclabs/nakama-common/runtime"
 )
@@ -57,10 +58,19 @@ func extractIPonAuth(ctx context.Context, logger runtime.Logger, nk runtime.Naka
 	accountId := ctx.Value(runtime.RUNTIME_CTX_USER_ID).(string)
 	logger.Info("Update User %s IP: %s", accountId, userIp)
 
-	metadata := make(map[string]interface{})
+	account, err := nk.AccountGetId(ctx, accountId)
+	if err != nil {
+		return err
+	}
+	user := account.GetUser()
+	var metadata map[string]any
+
+	if err := json.Unmarshal([]byte(user.Metadata), &metadata); err != nil {
+		return err
+	}
 	metadata["PlayerIp"] = userIp
 
-	err := nk.AccountUpdateId(
+	err = nk.AccountUpdateId(
 		ctx,
 		accountId,
 		"",
