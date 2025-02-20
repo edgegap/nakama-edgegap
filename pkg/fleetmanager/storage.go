@@ -30,8 +30,8 @@ type StorageManager struct {
 	logger runtime.Logger
 }
 
-// updateDbGameSession updates an existing game session in the database.
-func (sm *StorageManager) updateDbGameSession(ctx context.Context, instance *runtime.InstanceInfo) error {
+// updateDbInstanceSession updates an existing instance session in the database.
+func (sm *StorageManager) updateDbInstanceSession(ctx context.Context, instance *runtime.InstanceInfo) error {
 	// Sync instance metadata before updating storage
 	err := sm.SyncInstance(instance)
 	if err != nil {
@@ -118,8 +118,8 @@ func (sm *StorageManager) GetAvailableSeat(instance *runtime.InstanceInfo) (int,
 	return -1, nil
 }
 
-// createDbGameSession creates and stores a new game session in the database.
-func (sm *StorageManager) createDbGameSession(ctx context.Context, id string, maxPlayers int, userIds []string, callbackId string, metadata map[string]any) (*runtime.InstanceInfo, error) {
+// createDbInstanceSession creates and stores a new instance session in the database.
+func (sm *StorageManager) createDbInstanceSession(ctx context.Context, id string, maxPlayers int, userIds []string, callbackId string, metadata map[string]any) (*runtime.InstanceInfo, error) {
 	// Initialize metadata if nil
 	if metadata == nil {
 		metadata = make(map[string]any)
@@ -133,7 +133,7 @@ func (sm *StorageManager) createDbGameSession(ctx context.Context, id string, ma
 		Connections:  []string{},
 	}
 
-	// Create a new game session instance
+	// Create a new instance session instance
 	instance := &runtime.InstanceInfo{
 		Id:             id,
 		ConnectionInfo: nil,
@@ -166,8 +166,8 @@ func (sm *StorageManager) createDbGameSession(ctx context.Context, id string, ma
 	return instance, err
 }
 
-// listDbGameSessions retrieves all stored game sessions from Nakama.
-func (sm *StorageManager) listDbGameSessions(ctx context.Context) ([]*runtime.InstanceInfo, error) {
+// listDbInstanceSessions retrieves all stored instance sessions from Nakama.
+func (sm *StorageManager) listDbInstanceSessions(ctx context.Context) ([]*runtime.InstanceInfo, error) {
 	instances := make([]*runtime.InstanceInfo, 0)
 	cursor := ""
 
@@ -197,8 +197,8 @@ func (sm *StorageManager) listDbGameSessions(ctx context.Context) ([]*runtime.In
 	return instances, nil
 }
 
-// getDbGameSession retrieves a single game session by ID from the Nakama database.
-func (sm *StorageManager) getDbGameSession(ctx context.Context, id string) (*runtime.InstanceInfo, error) {
+// getDbInstanceSession retrieves a single instance session by ID from the Nakama database.
+func (sm *StorageManager) getDbInstanceSession(ctx context.Context, id string) (*runtime.InstanceInfo, error) {
 	objects, err := sm.nk.StorageRead(ctx, []*runtime.StorageRead{{
 		Collection: StorageEdgegapInstancesCollection,
 		Key:        id,
@@ -223,8 +223,8 @@ func (sm *StorageManager) getDbGameSession(ctx context.Context, id string) (*run
 	return instance, nil
 }
 
-// deleteStorageGameSessions removes game sessions from Nakama storage.
-func (sm *StorageManager) deleteStorageGameSessions(ctx context.Context, ids []string) error {
+// deleteStorageInstanceSessions removes instance sessions from Nakama storage.
+func (sm *StorageManager) deleteStorageInstanceSessions(ctx context.Context, ids []string) error {
 	deletes := make([]*runtime.StorageDelete, 0, len(ids))
 
 	// Prepare delete requests for each session ID

@@ -118,23 +118,23 @@ func (efm *EdgegapFleetManager) Create(ctx context.Context, maxPlayers int, user
 		return errors.New("failed to create deployment")
 	}
 
-	// Store the new game session in the database
-	_, err = efm.storageManager.createDbGameSession(ctx, deployment.RequestId, maxPlayers, userIds, callbackId, metadata)
+	// Store the new instance session in the database
+	_, err = efm.storageManager.createDbInstanceSession(ctx, deployment.RequestId, maxPlayers, userIds, callbackId, metadata)
 	if err != nil {
-		efm.logger.WithField("error", err).Error("failed to create Storage Game Session")
-		efm.callbackHandler.InvokeCallback(callbackId, runtime.CreateError, nil, nil, nil, errors.New("error while creating Game Session"))
+		efm.logger.WithField("error", err).Error("failed to create Storage Instance Session")
+		efm.callbackHandler.InvokeCallback(callbackId, runtime.CreateError, nil, nil, nil, errors.New("error while creating Instance Session"))
 		return err
 	}
 
 	return nil
 }
 
-// Get retrieves a game session instance by its ID.
+// Get retrieves a instance session instance by its ID.
 func (efm *EdgegapFleetManager) Get(ctx context.Context, id string) (*runtime.InstanceInfo, error) {
-	return efm.storageManager.getDbGameSession(ctx, id)
+	return efm.storageManager.getDbInstanceSession(ctx, id)
 }
 
-// List retrieves game session instances based on a query, sorted by player count and creation time.
+// List retrieves instance session instances based on a query, sorted by player count and creation time.
 func (efm *EdgegapFleetManager) List(ctx context.Context, query string, limit int, cursor string) ([]*runtime.InstanceInfo, string, error) {
 	entries, newCursor, err := efm.nk.StorageIndexList(ctx, "", StorageEdgegapIndex, query, limit, []string{"player_count", "-create_time"}, cursor)
 	if err != nil {
@@ -153,13 +153,13 @@ func (efm *EdgegapFleetManager) List(ctx context.Context, query string, limit in
 	return results, newCursor, nil
 }
 
-// Join allows users to join an existing game session.
+// Join allows users to join an existing instance session.
 func (efm *EdgegapFleetManager) Join(ctx context.Context, id string, userIds []string, metadata map[string]string) (*runtime.JoinInfo, error) {
 	if id == "" {
-		return nil, errors.New("expects id to be a valid GameSessionId")
+		return nil, errors.New("expects id to be a valid InstanceSessionId")
 	}
 
-	instance, err := efm.storageManager.getDbGameSession(ctx, id)
+	instance, err := efm.storageManager.getDbInstanceSession(ctx, id)
 	if err != nil {
 		return nil, errors.New("instance not found")
 	}
@@ -195,29 +195,33 @@ func (efm *EdgegapFleetManager) Join(ctx context.Context, id string, userIds []s
 
 	instance.Metadata["edgegap"] = edgegapInstance
 
-	// Update the game session in the database
-	err = efm.storageManager.updateDbGameSession(ctx, instance)
+	// Update the instance session in the database
+	err = efm.storageManager.updateDbInstanceSession(ctx, instance)
 	if err != nil {
-		return nil, errors.New("error updating db game session")
+		return nil, errors.New("error updating db instance session")
 	}
 
 	return joinInfo, nil
 }
 
-// Update modifies a game session's player count and metadata.
+// Update modifies a instance session's player count and metadata.
 func (efm *EdgegapFleetManager) Update(ctx context.Context, id string, playerCount int, metadata map[string]any) error {
-	instance, err := efm.storageManager.getDbGameSession(ctx, id)
+	instance, err := efm.storageManager.getDbInstanceSession(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to read instance info from db: %s", err.Error())
 	}
 
-	efm.logger.Warn("Player Count should not be updated manually and only from the Game Server SDK")
+	efm.logger.Warn("Player Count should not be updated manually and only from the Instance Server SDK")
 	instance.PlayerCount = playerCount
 
-	return efm.storageManager.updateDbGameSession(ctx, instance)
+	return efm.storageManager.updateDbInstanceSession(ctx, instance)
 }
 
-// Delete removes a game session from the database.
+// Delete removes a instance session from the database.
 func (efm *EdgegapFleetManager) Delete(ctx context.Context, id string) error {
-	return efm.storageManager.deleteStorageGameSessions(ctx, []string{id})
+	return efm.storageManager.deleteStorageInstanceSessions(ctx, []string{id})
+}
+
+func (efm *EdgegapFleetManager) syncInstancesWorker() {
+
 }

@@ -14,7 +14,7 @@ MaxPlayers-Reservations-Connections=AvailableSeats)
 
 TODO 
 
-- Containerize Game
+- Containerize Instance
 - Create Edgegap's Account
 - Create Application and Version
 - Create API Token
@@ -22,13 +22,14 @@ TODO
 ## Nakama Setup
 
 You must set up the following Environment Variable inside your Nakama's cluster:
-
-- EDGEGAP_API_URL=https://api.edgegap.com
-- EDGEGAP_API_TOKEN=<The Edgegap's API Token (keep the 'token' in the API Token)
-- EDGEGAP_APPLICATION=<The Edgegap's Application Name to use to deploy>
-- EDGEGAP_VERSION=<The Edgegap's Version Name to use to deploy>
-- EDGEGAP_PORT_NAME=<The Edgegap's Application Port Name to send to game client>
-- NAKAMA_ACCESS_URL=<Nakama API Url, for Heroic Cloud, it will be provided when you create your instance>
+```shell
+EDGEGAP_API_URL=https://api.edgegap.com
+EDGEGAP_API_TOKEN=<The Edgegap's API Token (keep the 'token' in the API Token)
+EDGEGAP_APPLICATION=<The Edgegap's Application Name to use to deploy>
+EDGEGAP_VERSION=<The Edgegap's Version Name to use to deploy>
+EDGEGAP_PORT_NAME=<The Edgegap's Application Port Name to send to game client>
+NAKAMA_ACCESS_URL=<Nakama API Url, for Heroic Cloud, it will be provided when you create your instance>
+```
 
 You can copy the `local.yml.example` to `local.yml` and fill it out to start with your local cluster
 
@@ -48,7 +49,7 @@ return err
 
 This will automatically store in Profile's Metadata the `PlayerIP`
 
-## Game Server -> Nakama
+## Instance Server -> Nakama
 
 TODO
 
@@ -57,7 +58,7 @@ TODO
 The following Environment Variables will be available in the game server:
 
 - `NAKAMA_CONNECTION_EVENT_URL` (url to send connection events of the players)
-- `NAKAMA_GAME_EVENT_URL` (url to send game event actions)
+- `NAKAMA_GAME_EVENT_URL` (url to send instance event actions)
 - `NAKAMA_GAME_METADATA` (contains create metadata JSON)
 
 ### Connection Events
@@ -67,25 +68,25 @@ to the Nakama instance with the following body:
 
 ```json
 {
-  "game_id": "<game_id>",
+  "instance_id": "<instance_id>",
   "connections": [
     "<user_id>"
   ]
 }
 ```
 
-`connections` is the list of active user IDs connected to the game server, on event change like
+`connections` is the list of active user IDs connected to the instance server, on event change like
 disconnections/reconnections
 simply send the updated list on each event.
 
-### Game Events
+### Instance Events
 
-using `NAKAMA_GAME_EVENT_URL` you must send game action
+using `NAKAMA_GAME_EVENT_URL` you must send instance action
 to the Nakama instance with the following body:
 
 ```json
 {
-  "game_id": "<game_id>",
+  "instance_id": "<instance_id>",
   "action": "[READY|ERROR|STOP]",
   "message": "",
   "metadata": {}
@@ -94,21 +95,21 @@ to the Nakama instance with the following body:
 
 The `action` must be one of the following:
 
-- READY (will mark the game as ready and trigger callback event to notify players)
-- ERROR (will mark the game in error and trigger callback event to notify players)
+- READY (will mark the instance as ready and trigger callback event to notify players)
+- ERROR (will mark the instance in error and trigger callback event to notify players)
 - STOP (will call Edgegap's API to stop the running deployment)
 
 The field `message` is to provide extra data (most likely for Error Action)
 
-The field `metadata` will be merged to the metadata of the instance info (game)
+The field `metadata` will be merged to the metadata of the instance info (instance)
 
-## Game Client -> Nakama (optional rpc)
+## Instance Client -> Nakama (optional rpc)
 
 TODO 
 
-### Create Game
+### Create Instance
 
-RPC - game_create
+RPC - instance_create
 
 ```json
 {
@@ -122,19 +123,19 @@ RPC - game_create
 
 if `user_ids` is empty, the user's ID calling this will be used
 
-### Get Game
+### Get Instance
 
-RPC - game_get
+RPC - instance_get
 
 ```json
 {
-  "game_id": "<game_id>"
+  "instance_id": "<instance_id>"
 }
 ```
 
-### List Game
+### List Instance
 
-RPC - game_list
+RPC - instance_list
 
 ```json
 {
@@ -144,9 +145,9 @@ RPC - game_list
 }
 ```
 
-`query` can be used to search game with available seats
+`query` can be used to search instance with available seats
 
-Example to list all games READY with at least 1 seat available
+Example to list all instances READY with at least 1 seat available
 
 ```json
 {
@@ -157,13 +158,13 @@ Example to list all games READY with at least 1 seat available
 
 ```
 
-### Join Game
+### Join Instance
 
-RPC - game_join
+RPC - instance_join
 
 ```json
 {
-  "game_id": "<game_id>",
+  "instance_id": "<instance_id>",
   "user_ids": []
 }
 ```
