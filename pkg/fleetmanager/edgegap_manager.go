@@ -10,6 +10,7 @@ import (
 	"github.com/heroiclabs/nakama-common/runtime"
 	"io"
 	"net/http"
+	"strconv"
 )
 
 type EdgegapManager struct {
@@ -141,12 +142,12 @@ func (em *EdgegapManager) getDeploymentCreation(usersIP []string, metadata map[s
 				IsHidden: true,
 			},
 			{
-				Key:      "NAKAMA_GAME_EVENT_URL",
+				Key:      "NAKAMA_INSTANCE_EVENT_URL",
 				Value:    em.getFormattedUrl(RpcIdEventInstance),
 				IsHidden: true,
 			},
 			{
-				Key:      "NAKAMA_GAME_METADATA",
+				Key:      "NAKAMA_INSTANCE_METADATA",
 				Value:    string(metadataValue),
 				IsHidden: false,
 			},
@@ -182,4 +183,44 @@ func (em *EdgegapManager) StopDeployment(requestID string) (*EdgegapApiMessage, 
 	}
 
 	return nil, errors.New("Error stopping edgegap deployment " + requestID)
+}
+
+// ListAllDeployments retrieves all deployment summaries from the Edgegap API by paginating until no more pages exist.
+func (em *EdgegapManager) ListAllDeployments() ([]EdgegapDeploymentSummary, error) {
+	var allDeployments []EdgegapDeploymentSummary
+	page := 1
+
+	for {
+		reply, err := em.apiHelper.Get("/v1/deployments?page=" + strconv.Itoa(page))
+		if err != nil {
+			return nil, err
+		}
+		defer reply.Body.Close()
+
+		if reply.StatusCode != http.StatusOK {
+			return nil, errors.New("error listing all Edgegap deployments")
+		}
+
+		body, err := io.ReadAll(reply.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		var response EdgegapDeploymentList
+		err = json.Unmarshal(body, &response)
+		if err != nil {
+			return nil, err
+		}
+
+		allDeployments = append(allDeployments, response.Data...)
+
+		// Check if there's another page
+		if !response.Pagination.HasNext {
+			break
+		}
+
+		page = response.Pagination.NextPageNumber
+	}
+
+	return allDeployments, nil
 }

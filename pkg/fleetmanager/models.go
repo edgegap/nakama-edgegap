@@ -64,6 +64,23 @@ type EdgegapApiMessage struct {
 	Message string `json:"message"`
 }
 
+type EdgegapDeploymentSummary struct {
+	RequestId string `json:"request_id"`
+	Ready     bool   `json:"ready"`
+}
+
+type EdgegapPagination struct {
+	Number         int  `json:"number"`
+	NextPageNumber int  `json:"next_page_number"`
+	HasNext        bool `json:"has_next"`
+}
+
+type EdgegapDeploymentList struct {
+	Data       []EdgegapDeploymentSummary `json:"data"`
+	TotalCount int                        `json:"total_count"`
+	Pagination EdgegapPagination          `json:"pagination"`
+}
+
 type ConnectionEventMessage struct {
 	InstanceId  string   `json:"instance_id"`
 	Connections []string `json:"connections"`

@@ -9,6 +9,7 @@ import (
 	"github.com/edgegap/nakama-edgegap/internal/helpers"
 	"github.com/heroiclabs/nakama-common/runtime"
 	"sync"
+	"time"
 )
 
 var (
@@ -129,7 +130,7 @@ func (efm *EdgegapFleetManager) Create(ctx context.Context, maxPlayers int, user
 	return nil
 }
 
-// Get retrieves a instance session instance by its ID.
+// Get retrieves an instance session instance by its ID.
 func (efm *EdgegapFleetManager) Get(ctx context.Context, id string) (*runtime.InstanceInfo, error) {
 	return efm.storageManager.getDbInstanceSession(ctx, id)
 }
@@ -204,7 +205,7 @@ func (efm *EdgegapFleetManager) Join(ctx context.Context, id string, userIds []s
 	return joinInfo, nil
 }
 
-// Update modifies a instance session's player count and metadata.
+// Update modifies an instance session's player count and metadata.
 func (efm *EdgegapFleetManager) Update(ctx context.Context, id string, playerCount int, metadata map[string]any) error {
 	instance, err := efm.storageManager.getDbInstanceSession(ctx, id)
 	if err != nil {
@@ -217,11 +218,63 @@ func (efm *EdgegapFleetManager) Update(ctx context.Context, id string, playerCou
 	return efm.storageManager.updateDbInstanceSession(ctx, instance)
 }
 
-// Delete removes a instance session from the database.
+// Delete removes an instance session from the database.
 func (efm *EdgegapFleetManager) Delete(ctx context.Context, id string) error {
+	_, err := efm.edgegapManager.StopDeployment(id)
+	if err != nil {
+		return err
+	}
 	return efm.storageManager.deleteStorageInstanceSessions(ctx, []string{id})
 }
 
 func (efm *EdgegapFleetManager) syncInstancesWorker() {
+	deleteTerminatedInstancesFn := func() {
+		deployments, err := efm.edgegapManager.ListAllDeployments()
+		if err != nil {
+			efm.logger.WithField("error", err.Error()).Error("failed to list edgegap deployments")
+			return
+		}
+		efm.logger.WithField("active_deployments", len(deployments)).Debug("fetched active deployment instances list")
 
+		dbInstances, err := efm.storageManager.listDbInstanceSessions(efm.ctx)
+		if err != nil {
+			efm.logger.WithField("error", err.Error()).Error("failed to read instances from db")
+			return
+		}
+
+		activeInstancesMap := make(map[string]struct{}, len(deployments))
+		for _, i := range deployments {
+			activeInstancesMap[i.RequestId] = struct{}{}
+		}
+
+		instancesToRemove := make([]string, 0)
+		for _, dbInfo := range dbInstances {
+			if _, ok := activeInstancesMap[dbInfo.Id]; !ok {
+				instancesToRemove = append(instancesToRemove, dbInfo.Id)
+			}
+		}
+
+		if err = efm.storageManager.deleteStorageInstanceSessions(efm.ctx, instancesToRemove); err != nil {
+			efm.logger.WithField("error", err.Error()).Error("failed to delete a game instances")
+			return
+		}
+
+	}
+
+	deleteTerminatedInstancesFn()
+
+	duration, err := time.ParseDuration(efm.edgegapManager.configuration.PollingInterval)
+	if err != nil {
+		efm.logger.WithField("error", err.Error()).Error("failed to parse polling interval, defaulting to 15m")
+		duration = 15 * time.Minute
+	}
+	t := time.NewTicker(duration)
+	for {
+		select {
+		case <-efm.ctx.Done():
+			return
+		case <-t.C:
+			deleteTerminatedInstancesFn()
+		}
+	}
 }

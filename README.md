@@ -47,19 +47,23 @@ This will automatically store in Profile's Metadata the `PlayerIP`
 
 ## Instance Server -> Nakama
 
-TODO
+When using this integration, every Instance made through Edgegap's platform will have many Environment Variables
+injected into the Game Server.
+
+This the responsibility of the Game Server to trigger events when specific actions are triggered to communicate
+back to the Nakama's cluster to allow the Instance to be in sync and allow Players to connect to those instance.
 
 ### Injected Environment Variables
 
 The following Environment Variables will be available in the game server:
 
 - `NAKAMA_CONNECTION_EVENT_URL` (url to send connection events of the players)
-- `NAKAMA_GAME_EVENT_URL` (url to send instance event actions)
-- `NAKAMA_GAME_METADATA` (contains create metadata JSON)
+- `NAKAMA_INSTANCE_EVENT_URL` (url to send instance event actions)
+- `NAKAMA_INSTANCE_METADATA` (contains create metadata JSON)
 
 ### Connection Events
 
-using `NAKAMA_CONNECTION_EVENT_URL` you must send all connection event
+using `NAKAMA_CONNECTION_EVENT_URL` you must send all connection event (new connections, disconnections)
 to the Nakama instance with the following body:
 
 ```json
@@ -77,7 +81,8 @@ simply send the updated list on each event.
 
 ### Instance Events
 
-using `NAKAMA_GAME_EVENT_URL` you must send instance action
+using `NAKAMA_INSTANCE_EVENT_URL` you must send instance action (when the Game Server is ready to receive connections,
+in error or when it wants to stop)
 to the Nakama instance with the following body:
 
 ```json
@@ -99,9 +104,10 @@ The field `message` is to provide extra data (most likely for Error Action)
 
 The field `metadata` will be merged to the metadata of the instance info (instance)
 
-## Instance Client -> Nakama (optional rpc)
+## Game Client -> Nakama (optional rpc)
 
-TODO 
+This is an optional and included Client RPC route to do basic operation on Instance like listing, creating and joining.
+Feel free to create your own or use the matchmaker instead of this.
 
 ### Create Instance
 

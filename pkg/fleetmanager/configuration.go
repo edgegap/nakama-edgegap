@@ -8,6 +8,7 @@ import (
 	"github.com/heroiclabs/nakama-common/runtime"
 	"net/http"
 	"strings"
+	"time"
 )
 
 type EdgegapManagerConfiguration struct {
@@ -19,6 +20,7 @@ type EdgegapManagerConfiguration struct {
 	PortName        string `json:"port_name"`
 	NakamaAccessUrl string `json:"nakama_access_url"`
 	NakamaHttpKey   string `json:"nakama_http_key"`
+	PollingInterval string `json:"polling_interval"`
 }
 
 // NewEdgegapManagerConfiguration Create New Edgegap EdgegapManager Configuration and Fail if missing values
@@ -62,6 +64,11 @@ func NewEdgegapManagerConfiguration(ctx context.Context) (*EdgegapManagerConfigu
 		return nil, runtime.NewError("NAKAMA_ACCESS_URL not found in environment", 3)
 	}
 
+	pollingInterval, ok := env["EDGEGAP_POLLING_INTERVAL"]
+	if !ok {
+		pollingInterval = "15m"
+	}
+
 	mc := EdgegapManagerConfiguration{
 		NakamaNode:      nakamaNode,
 		ApiUrl:          url,
@@ -70,6 +77,7 @@ func NewEdgegapManagerConfiguration(ctx context.Context) (*EdgegapManagerConfigu
 		Version:         version,
 		PortName:        portName,
 		NakamaAccessUrl: nakamaAccessUrl,
+		PollingInterval: pollingInterval,
 	}
 
 	err := mc.Validate()
@@ -110,6 +118,10 @@ func (emc *EdgegapManagerConfiguration) Validate() error {
 
 	if emc.NakamaAccessUrl == "" {
 		errs = append(errs, errors.New("nakama access url must be set"))
+	}
+
+	if _, err := time.ParseDuration(emc.PollingInterval); err != nil {
+		errs = append(errs, errors.New("invalid polling interval: "+emc.PollingInterval))
 	}
 
 	// Check with Edgegap if App Version Exists while testing the Token and the URL of the API
