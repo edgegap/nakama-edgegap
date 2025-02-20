@@ -42,13 +42,13 @@ func NewEdgegapManager(ctx context.Context, logger runtime.Logger, initializer r
 
 	// Register RPC functions for handling various events
 	rpcToRegisters := map[string]func(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error){
-		RpcIdEventDeployment:   eem.handleDeploymentEvent,
-		RpcIdEventConnection:   eem.handleConnectionEvent,
-		RpcIdEventGame:         eem.handleGameEvent,
-		RpcIdGameSessionCreate: createGameSession,
-		RpcIdGameSessionGet:    getGameSession,
-		RpcIdGameSessionJoin:   joinGameSession,
-		RpcIdGameSessionList:   listGameSession,
+		RpcIdEventDeployment:       eem.handleDeploymentEvent,
+		RpcIdEventConnection:       eem.handleConnectionEvent,
+		RpcIdEventInstance:         eem.handleInstanceEvent,
+		RpcIdInstanceSessionCreate: createInstanceSession,
+		RpcIdInstanceSessionGet:    getInstanceSession,
+		RpcIdInstanceSessionJoin:   joinInstanceSession,
+		RpcIdInstanceSessionList:   listInstanceSession,
 	}
 
 	// Register each RPC function with the Nakama runtime
@@ -142,7 +142,7 @@ func (em *EdgegapManager) getDeploymentCreation(usersIP []string, metadata map[s
 			},
 			{
 				Key:      "NAKAMA_GAME_EVENT_URL",
-				Value:    em.getFormattedUrl(RpcIdEventGame),
+				Value:    em.getFormattedUrl(RpcIdEventInstance),
 				IsHidden: true,
 			},
 			{

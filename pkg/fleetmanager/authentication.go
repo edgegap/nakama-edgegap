@@ -33,8 +33,8 @@ func OnAuthenticateUpdateFacebook(ctx context.Context, logger runtime.Logger, db
 	return extractIPonAuth(ctx, logger, nk)
 }
 
-// OnAuthenticateUpdateFacebookInstantGame When the User connect with FacebookInstantGame, update and fetch his Client IP, so it can be used to deploy Edgegap's Server
-func OnAuthenticateUpdateFacebookInstantGame(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, out *api.Session, in *api.AuthenticateFacebookInstantGameRequest) error {
+// OnAuthenticateUpdateFacebookInstantInstance When the User connect with FacebookInstantInstance, update and fetch his Client IP, so it can be used to deploy Edgegap's Server
+func OnAuthenticateUpdateFacebookInstantInstance(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, out *api.Session, in *api.AuthenticateFacebookInstantGameRequest) error {
 	return extractIPonAuth(ctx, logger, nk)
 }
 
@@ -43,8 +43,8 @@ func OnAuthenticateUpdateSteam(ctx context.Context, logger runtime.Logger, db *s
 	return extractIPonAuth(ctx, logger, nk)
 }
 
-// OnAuthenticateUpdateGameCenter When the User connect with Game Center, update and fetch his Client IP, so it can be used to deploy Edgegap's Server
-func OnAuthenticateUpdateGameCenter(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, out *api.Session, in *api.AuthenticateGameCenterRequest) error {
+// OnAuthenticateUpdateInstanceCenter When the User connect with Instance Center, update and fetch his Client IP, so it can be used to deploy Edgegap's Server
+func OnAuthenticateUpdateInstanceCenter(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, out *api.Session, in *api.AuthenticateGameCenterRequest) error {
 	return extractIPonAuth(ctx, logger, nk)
 }
 

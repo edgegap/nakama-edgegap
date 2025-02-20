@@ -65,19 +65,19 @@ type EdgegapApiMessage struct {
 }
 
 type ConnectionEventMessage struct {
-	GameId      string   `json:"game_id"`
+	InstanceId  string   `json:"instance_id"`
 	Connections []string `json:"connections"`
 }
 
 const (
-	GameEventStateReady = "READY"
-	GameEventStateError = "ERROR"
-	GameEventStateStop  = "STOP"
+	InstanceEventStateReady = "READY"
+	InstanceEventStateError = "ERROR"
+	InstanceEventStateStop  = "STOP"
 )
 
-type GameEventMessage struct {
-	GameId   string         `json:"game_id"`
-	Action   string         `json:"action"`
-	Message  string         `json:"message"`
-	Metadata map[string]any `json:"metadata"`
+type InstanceEventMessage struct {
+	InstanceId string         `json:"instance_id"`
+	Action     string         `json:"action"`
+	Message    string         `json:"message"`
+	Metadata   map[string]any `json:"metadata"`
 }

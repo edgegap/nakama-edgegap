@@ -13,7 +13,7 @@ import (
 const (
 	RpcIdEventDeployment = "edgegap_deployment"
 	RpcIdEventConnection = "edgegap_connection"
-	RpcIdEventGame       = "edgegap_game"
+	RpcIdEventInstance   = "edgegap_instance"
 )
 
 var (
@@ -53,7 +53,7 @@ func (eem *EdgegapEventManager) unpack(ctx context.Context, payload string) (*Ev
 }
 
 // handleDeploymentEvent processes deployment-related events.
-// It extracts the payload, updates the game session status, and logs errors if necessary.
+// It extracts the payload, updates the instance session status, and logs errors if necessary.
 func (eem *EdgegapEventManager) handleDeploymentEvent(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	logger.Info("Handle Deployment")
 	msg, err := eem.unpack(ctx, payload)
@@ -66,7 +66,7 @@ func (eem *EdgegapEventManager) handleDeploymentEvent(ctx context.Context, logge
 		return "", err
 	}
 
-	instance, err := eem.sm.getDbGameSession(ctx, deployment.RequestId)
+	instance, err := eem.sm.getDbInstanceSession(ctx, deployment.RequestId)
 	if err != nil {
 		return "", err
 	}
@@ -102,7 +102,7 @@ func (eem *EdgegapEventManager) handleDeploymentEvent(ctx context.Context, logge
 		fmInstance.callbackHandler.InvokeCallback(ei.CallbackId, runtime.CreateError, nil, nil, nil, errors.New("an error occurred with edgegap deployment"))
 	}
 
-	err = eem.sm.updateDbGameSession(ctx, instance)
+	err = eem.sm.updateDbInstanceSession(ctx, instance)
 	if err != nil {
 		return "", err
 	}
@@ -111,7 +111,7 @@ func (eem *EdgegapEventManager) handleDeploymentEvent(ctx context.Context, logge
 }
 
 // handleConnectionEvent processes connection-related events.
-// It updates the game session's connection and reservation metadata.
+// It updates the instance session's connection and reservation metadata.
 func (eem *EdgegapEventManager) handleConnectionEvent(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	msg, err := eem.unpack(ctx, payload)
 	if err != nil {
@@ -123,13 +123,13 @@ func (eem *EdgegapEventManager) handleConnectionEvent(ctx context.Context, logge
 		return "", err
 	}
 
-	instance, err := eem.sm.getDbGameSession(ctx, connectionEvent.GameId)
+	instance, err := eem.sm.getDbInstanceSession(ctx, connectionEvent.InstanceId)
 	if err != nil {
 		return "", err
 	}
 
 	if instance == nil {
-		return "", errors.New("no instance found with gameId " + connectionEvent.GameId)
+		return "", errors.New("no instance found with instanceId " + connectionEvent.InstanceId)
 	}
 
 	edgegapInstance, err := eem.sm.ExtractEdgegapInstance(instance)
@@ -143,7 +143,7 @@ func (eem *EdgegapEventManager) handleConnectionEvent(ctx context.Context, logge
 	edgegapInstance.Connections = connectionEvent.Connections
 	instance.Metadata["edgegap"] = edgegapInstance
 
-	err = eem.sm.updateDbGameSession(ctx, instance)
+	err = eem.sm.updateDbInstanceSession(ctx, instance)
 	if err != nil {
 		return "", err
 	}
@@ -151,37 +151,37 @@ func (eem *EdgegapEventManager) handleConnectionEvent(ctx context.Context, logge
 	return "ok", nil
 }
 
-// handleGameEvent processes game state change events.
-// It updates the game session's status based on the event action.
-func (eem *EdgegapEventManager) handleGameEvent(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+// handleInstanceEvent processes instance state change events.
+// It updates the instance session's status based on the event action.
+func (eem *EdgegapEventManager) handleInstanceEvent(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	msg, err := eem.unpack(ctx, payload)
 	if err != nil {
 		return "", err
 	}
 
-	var gameEvent GameEventMessage
-	if err := json.Unmarshal([]byte(msg.payload), &gameEvent); err != nil {
+	var instanceEvent InstanceEventMessage
+	if err := json.Unmarshal([]byte(msg.payload), &instanceEvent); err != nil {
 		return "", err
 	}
 
-	instance, err := eem.sm.getDbGameSession(ctx, gameEvent.GameId)
+	instance, err := eem.sm.getDbInstanceSession(ctx, instanceEvent.InstanceId)
 	if err != nil {
 		return "", err
 	}
 
 	if instance == nil {
-		return "", errors.New("no instance found with gameId " + gameEvent.GameId)
+		return "", errors.New("no instance found with instanceId " + instanceEvent.InstanceId)
 	}
 
 	stopping := false
 
-	switch strings.ToUpper(gameEvent.Action) {
-	case GameEventStateReady:
-		logger.Info("Edgegap game ready id=%s : %s", gameEvent.GameId, gameEvent.Message)
+	switch strings.ToUpper(instanceEvent.Action) {
+	case InstanceEventStateReady:
+		logger.Info("Edgegap instance ready id=%s : %s", instanceEvent.InstanceId, instanceEvent.Message)
 		instance.Status = EdgegapStatusReady
 
-		// Extract new Metadata coming from the Game Server and merge it with current
-		instance.Metadata = helpers.MergeMaps(instance.Metadata, gameEvent.Metadata)
+		// Extract new Metadata coming from the Instance Server and merge it with current
+		instance.Metadata = helpers.MergeMaps(instance.Metadata, instanceEvent.Metadata)
 
 		ei, err := eem.sm.ExtractEdgegapInstance(instance)
 		if err != nil {
@@ -189,27 +189,27 @@ func (eem *EdgegapEventManager) handleGameEvent(ctx context.Context, logger runt
 		}
 		fmInstance.callbackHandler.InvokeCallback(ei.CallbackId, runtime.CreateSuccess, instance, nil, nil, nil)
 
-	case GameEventStateStop:
-		logger.Info("Edgegap game stop #%s: %s", gameEvent.GameId, gameEvent.Message)
+	case InstanceEventStateStop:
+		logger.Info("Edgegap instance stop #%s: %s", instanceEvent.InstanceId, instanceEvent.Message)
 		instance.Status = EdgegapStatusStopping
 		stopping = true
 
-	case GameEventStateError:
-		logger.Error("Edgegap game state error #%s: %s", gameEvent.GameId, gameEvent.Message)
+	case InstanceEventStateError:
+		logger.Error("Edgegap instance state error #%s: %s", instanceEvent.InstanceId, instanceEvent.Message)
 		instance.Status = EdgegapStatusError
 
 	default:
-		logger.Error("Unknown action #%s: %s", gameEvent.Action, gameEvent.Message)
+		logger.Error("Unknown action #%s: %s", instanceEvent.Action, instanceEvent.Message)
 		instance.Status = EdgegapStatusUnknown
 	}
 
-	err = eem.sm.updateDbGameSession(ctx, instance)
+	err = eem.sm.updateDbInstanceSession(ctx, instance)
 	if err != nil {
 		return "", err
 	}
 
 	if stopping {
-		_, err := fmInstance.edgegapManager.StopDeployment(gameEvent.GameId)
+		_, err := fmInstance.edgegapManager.StopDeployment(instanceEvent.InstanceId)
 		if err != nil {
 			return "", err
 		}
