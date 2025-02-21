@@ -1,6 +1,6 @@
 # Nakama <> Edgegap Integration
 
-Deploy dedicated game engine servers for popular engines (e.g., Unity, Unreal, etc.) or custom engine servers, fully integrated with Nakama's open-source player data and game services for a convenient turnkey solution.
+Deploy Dedicated Game Servers for popular engines (e.g., Unity, Unreal, etc.) or custom engine servers, fully integrated with Nakama's open-source player data and game services for a convenient turnkey solution.
 
 ## Edgegap Setup
 
@@ -48,7 +48,7 @@ MaxPlayers-Reservations-Connections=AvailableSeats)
 
 ## Usage
 
-from your `main.go` where the `InitModule` global function is, you need to register the Fleet Manager
+From your `main.go` where the `InitModule` global function is, you need to register the Fleet Manager
 
 ```go
 // Register the Fleet Manager
@@ -63,7 +63,7 @@ if err = initializer.RegisterFleetManager(efm); err != nil {
 }
 ```
 
-you can use the `main.go` from this project and also copy the `local.yml.example` to start a local Nakama using docker compose.
+You can use the `main.go` from this project and also copy the `local.yml.example` to start a local Nakama using docker compose.
 
 copy `docker-compose.yml` and `Dockerfile` to the root of your project and run the following command to start a local cluster:
 ```shell
@@ -90,17 +90,18 @@ In your `main.go`, during the Init you can add the Registration of the Authentic
 
 This will automatically store in Profile's Metadata the `PlayerIP`
 
-## Instance Server -> Nakama
+## Dedicated Game Server -> Nakama Instance
 
-When using this integration, every Instance made through Edgegap's platform will have many Environment Variables
-injected into the Game Server.
+When using this integration, every Deployment (Dedicated Game Server) made through Edgegap's platform will have many Environment Variables
+injected.
 
-This the responsibility of the Game Server to trigger events when specific actions are triggered to communicate
-back to the Nakama's cluster to allow the Instance to be in sync and allow Players to connect to those instance.
+It's the responsibility of the Dedicated Game Server to fire lifecycle events when specific actions are triggered to communicate
+back to Nakama's cluster changes regarding the Instance (Nakama's reference to an Edgegap Deployment) and facilitate Player connections to
+the Dedicated Game Server.
 
 ### Injected Environment Variables
 
-The following Environment Variables will be available in the game server:
+The following Environment Variables will be available in the Dedicated Game Server:
 
 - `NAKAMA_CONNECTION_EVENT_URL` (url to send connection events of the players)
 - `NAKAMA_INSTANCE_EVENT_URL` (url to send instance event actions)
@@ -108,8 +109,7 @@ The following Environment Variables will be available in the game server:
 
 ### Connection Events
 
-using `NAKAMA_CONNECTION_EVENT_URL` you must send all connection event (new connections, disconnections)
-to the Nakama instance with the following body:
+Using `NAKAMA_CONNECTION_EVENT_URL` you must send Player Connection events to the Nakama Instance with the following body:
 
 ```json
 {
@@ -120,15 +120,13 @@ to the Nakama instance with the following body:
 }
 ```
 
-`connections` is the list of active user IDs connected to the instance server, on event change like
-disconnections/reconnections
-simply send the updated list on each event.
+`connections` is the list of active user IDs connected to the Dedicated Game Server. We recommend collecting updates
+over a short period of time (~5 seconds) and updating the full list of connections in a batch request. Contents of
+this request will overwrite any existing list of connections for the specified instance.
 
 ### Instance Events
 
-using `NAKAMA_INSTANCE_EVENT_URL` you must send instance action (when the Game Server is ready to receive connections,
-in error or when it wants to stop)
-to the Nakama instance with the following body:
+Using `NAKAMA_INSTANCE_EVENT_URL` you must send Instance events to the Nakama Instance with the following body:
 
 ```json
 {
@@ -139,20 +137,20 @@ to the Nakama instance with the following body:
 }
 ```
 
-The `action` must be one of the following:
+`action` must be one of the following:
 
-- READY (will mark the instance as ready and trigger callback event to notify players)
-- ERROR (will mark the instance in error and trigger callback event to notify players)
-- STOP (will call Edgegap's API to stop the running deployment)
+- `READY` will mark the instance as ready and trigger Nakama callback event to notify players,
+- `ERROR` will mark the instance in error and trigger Nakama callback event to notify players,
+- `STOP` will call Edgegap's API to stop the running deployment, which will be removed from Nakama once Edgegap confirms termination.
 
-The field `message` is to provide extra data (most likely for Error Action)
+`message` can be used optionally to provide extra Instance status information (e.g. to communicate Errors).
 
-The field `metadata` will be merged to the metadata of the instance info (instance)
+`metadata` can be used optionally to merge additional custom key-value information available in Dedicated Game Server to the metadata of the Instance.
 
 ## Game Client -> Nakama (optional rpc)
 
-This is an optional and included Client RPC route to do basic operation on Instance like listing, creating and joining.
-Feel free to create your own or use the matchmaker instead of this.
+We included a Client RPC route to do basic operations on Instance - listing, creating, and joining. Consider this an optional starter code sample.
+For production/live use cases, we recommend using a matchmaker for added security and flexibility.
 
 ### Create Instance
 
@@ -166,9 +164,9 @@ RPC - instance_create
 }
 ```
 
-`max_players` to -1 for unlimited
+`max_players` to -1 for unlimited. Use with caution, we recommend performing a benchmark for server resource usage impact.
 
-if `user_ids` is empty, the user's ID calling this will be used
+If `user_ids` is empty, the requesting user's ID will be used.
 
 ### Get Instance
 
@@ -192,9 +190,9 @@ RPC - instance_list
 }
 ```
 
-`query` can be used to search instance with available seats
+`query` can be used to search instance with available seats.
 
-Example to list all instances READY with at least 1 seat available
+Example to list all instances READY with at least 1 seat available.
 
 ```json
 {
@@ -216,12 +214,11 @@ RPC - instance_join
 }
 ```
 
-if `user_ids` is empty, the user's ID calling this will be used
-
+If `user_ids` is empty, the requesting user's ID will be used.
 
 ## Matchmaker
 
-You can create your own integration using the Nakama's Matchmaker, this is an example on how you could do it:
+You can create your own integration using Nakama's Matchmaker, see our starter code sample:
 
 ```go
 // OnMatchmakerMatched When a match is created via matchmaker, collect the Users and create a instance
@@ -302,7 +299,7 @@ func OnMatchmakerMatched(ctx context.Context, logger runtime.Logger, db *sql.DB,
 }
 ```
 
-and register it like this in the `InitModule` function in your `main.go`
+Register `OnMatchmakerMatched` callback like this in the `InitModule` function in your `main.go`:
 
 ```go
 err = initializer.RegisterMatchmakerMatched(OnMatchmakerMatched)
@@ -311,3 +308,7 @@ if err != nil {
     return err
 }
 ```
+
+## Support and Troubleshooting
+
+For Edgegap-related questions and reports, please reach out to us over our [Community Discord](http://discord.gg/MmJf8fWjnt) and include your deployment ID if possible.
