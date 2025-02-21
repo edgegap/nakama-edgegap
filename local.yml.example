@@ -15,3 +15,6 @@ runtime:
     - "EDGEGAP_VERSION=sample"
     - "EDGEGAP_PORT_NAME=game"
     - "NAKAMA_ACCESS_URL=https://changeme.nakamacloud.io"
+    # - "EDGEGAP_POLLING_INTERVAL=15m"
+    # - "NAKAMA_CLEANUP_INTERVAL=1m"
+    # - "NAKAMA_RESERVATION_MAX_DURATION=30s"

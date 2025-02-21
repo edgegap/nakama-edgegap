@@ -273,7 +273,7 @@ func (efm *EdgegapFleetManager) syncInstancesWorker() {
 		duration = 15 * time.Minute
 	}
 	t := time.NewTicker(duration)
-	efm.logger.Info("Starting Instance Worker for Sync")
+	efm.logger.Info("Starting Instance Worker for Sync every %s", duration.String())
 	for {
 		select {
 		case <-efm.ctx.Done():
@@ -339,7 +339,7 @@ func (efm *EdgegapFleetManager) runCleanupScheduler() {
 	}
 	t := time.NewTicker(duration)
 
-	efm.logger.Info("Starting cleanup scheduler")
+	efm.logger.Info("Starting cleanup scheduler every %s", duration.String())
 	for {
 		select {
 		case <-efm.ctx.Done():

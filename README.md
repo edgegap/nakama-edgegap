@@ -8,12 +8,21 @@ To prepare your dedicated game server build for deployment on Edgegap, see:
 - [Getting Started with Servers (Unity)](https://docs.edgegap.com/learn/unity-games/getting-started-with-servers)
 - [Getting Started with Servers (Unreal Engine)](https://docs.edgegap.com/learn/unreal-engine-games/getting-started-with-servers)
 
+## Installation 
+
+To add the Edgegap Fleet Manager to your Nakama go plugin project, use the following command:
+```shell
+go get github.com/edgegap/nakama-edgegap
+```
+
+This will add it to your project's `go.mod` dependencies.
+
 ## Nakama Setup
 
 You must set up the following Environment Variable inside your Nakama's cluster:
 ```shell
 EDGEGAP_API_URL=https://api.edgegap.com
-EDGEGAP_API_TOKEN=<The Edgegap's API Token (keep the 'token' in the API Token)
+EDGEGAP_API_TOKEN=<The Edgegap's API Token (keep the 'token' in the API Token)>
 EDGEGAP_APPLICATION=<The Edgegap's Application Name to use to deploy>
 EDGEGAP_VERSION=<The Edgegap's Version Name to use to deploy>
 EDGEGAP_PORT_NAME=<The Edgegap's Application Port Name to send to game client>
@@ -22,6 +31,13 @@ NAKAMA_ACCESS_URL=<Nakama API Url, for Heroic Cloud, it will be provided when yo
 
 You can copy the `local.yml.example` to `local.yml` and fill it out to start with your local cluster
 
+Optional Values with default
+```shell
+EDGEGAP_POLLING_INTERVAL=<Interval where Nakama will sync with Edgegap API in case of mistmach (default:15m ) >
+NAKAMA_CLEANUP_INTERVAL==<Interval where Nakama will check reservations expiration (default:1m )
+NAKAMA_RESERVATION_MAX_DURATION==<Max Duration of a reservations before it expires (default:30s )
+```
+
 Using the Nakama's Storage Index and basic struct Instance Info,
 we store extra information in the metadata for Edgegap using 2 list.
 1 list to holds seats reservations
@@ -29,6 +45,35 @@ we store extra information in the metadata for Edgegap using 2 list.
 
 Using Max Players field we can now create the field `AvailableSeats` that will be in sync with that (
 MaxPlayers-Reservations-Connections=AvailableSeats)
+
+## Usage
+
+from your `main.go` where the `InitModule` global function is, you need to register the Fleet Manager
+
+```go
+// Register the Fleet Manager
+efm, err := fleetmanager.NewEdgegapFleetManager(ctx, logger, db, nk, initializer)
+if err != nil {
+    return err
+}
+
+if err = initializer.RegisterFleetManager(efm); err != nil {
+    logger.WithField("error", err).Error("failed to register Edgegap fleet manager")
+    return err
+}
+```
+
+you can use the `main.go` from this project and also copy the `local.yml.example` to start a local Nakama using docker compose.
+
+copy `docker-compose.yml` and `Dockerfile` to the root of your project and run the following command to start a local cluster:
+```shell
+docker compose up --build -d
+```
+
+Run the following command to stop it
+```shell
+docker compose down
+```
 
 ## Server Placement
 
@@ -176,4 +221,93 @@ if `user_ids` is empty, the user's ID calling this will be used
 
 ## Matchmaker
 
-TODO
+You can create your own integration using the Nakama's Matchmaker, this is an example on how you could do it:
+
+```go
+// OnMatchmakerMatched When a match is created via matchmaker, collect the Users and create a instance
+func OnMatchmakerMatched(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, entries []runtime.MatchmakerEntry) (string, error) {
+	maxPlayers := len(entries)
+	userIds := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		userIds = append(userIds, entry.GetPresence().GetUserId())
+	}
+	
+	var callback runtime.FmCreateCallbackFn = func(status runtime.FmCreateStatus, instanceInfo *runtime.InstanceInfo, sessionInfo []*runtime.SessionInfo, metadata map[string]any, createErr error) {
+		switch status {
+		case runtime.CreateSuccess:
+			logger.Info("Edgegap instance created: %s", instanceInfo.Id)
+
+			content := map[string]interface{}{
+				"IpAddress":  instanceInfo.ConnectionInfo.IpAddress,
+				"DnsName":    instanceInfo.ConnectionInfo.DnsName,
+				"Port":       instanceInfo.ConnectionInfo.Port,
+				"InstanceId": instanceInfo.Id,
+			}
+			// Send connection details notifications to players
+			for _, userId := range userIds {
+				subject := "connection-info"
+
+				code := notificationConnectionInfo
+				err := nk.NotificationSend(ctx, userId, subject, content, code, "", false)
+				if err != nil {
+					logger.WithField("error", err.Error()).Error("Failed to send notification")
+				}
+			}
+			return
+		case runtime.CreateTimeout:
+			logger.WithField("error", createErr.Error()).Error("Failed to create Edgegap instance, timed out")
+
+			// Send notification to client that instance session creation timed out
+			for _, userId := range userIds {
+				subject := "create-timeout"
+				content := map[string]interface{}{}
+				code := notificationCreateTimeout
+				err := nk.NotificationSend(ctx, userId, subject, content, code, "", false)
+				if err != nil {
+					logger.WithField("error", err.Error()).Error("Failed to send notification")
+				}
+			}
+		default:
+			logger.WithField("error", createErr.Error()).Error("Failed to create Edgegap instance")
+
+			// Send notification to client that instance session couldn't be created
+			for _, userId := range userIds {
+				subject := "create-failed"
+				content := map[string]interface{}{}
+				code := notificationCreateFailed
+				err := nk.NotificationSend(ctx, userId, subject, content, code, "", false)
+				if err != nil {
+					logger.WithField("error", err.Error()).Error("Failed to send notification")
+				}
+			}
+			return
+		}
+	}
+	
+	efm := nk.GetFleetManager()
+	err := efm.Create(ctx, maxPlayers, userIds, nil, nil, callback)
+
+	reply := instanceCreateReply{
+		Message: "Instance Created",
+		Ok:      true,
+	}
+
+	replyString, err := json.Marshal(reply)
+	if err != nil {
+		logger.WithField("error", err.Error()).Error("failed to marshal instance create reply")
+		return "", ErrInternalError
+	}
+
+	return string(replyString), err
+}
+```
+
+and register it like this in the `InitModule` function in your `main.go`
+
+```go
+err = initializer.RegisterMatchmakerMatched(OnMatchmakerMatched)
+if err != nil {
+    logger.WithField("error", err).Error("failed to register Matchmaker matched with fleet manager")
+    return err
+}
+```
