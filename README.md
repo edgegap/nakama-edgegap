@@ -34,8 +34,8 @@ You can copy the `local.yml.example` to `local.yml` and fill it out to start wit
 Optional Values with default
 ```shell
 EDGEGAP_POLLING_INTERVAL=<Interval where Nakama will sync with Edgegap API in case of mistmach (default:15m ) >
-NAKAMA_CLEANUP_INTERVAL==<Interval where Nakama will check reservations expiration (default:1m )
-NAKAMA_RESERVATION_MAX_DURATION==<Max Duration of a reservations before it expires (default:30s )
+NAKAMA_CLEANUP_INTERVAL=<Interval where Nakama will check reservations expiration (default:1m )
+NAKAMA_RESERVATION_MAX_DURATION=<Max Duration of a reservations before it expires (default:30s )
 ```
 
 Using the Nakama's Storage Index and basic struct Instance Info,
