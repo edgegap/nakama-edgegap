@@ -8,14 +8,14 @@ import (
 	"time"
 )
 
+// Constants for storage collection and index names
 const (
-	// Constants for storage collection and index names
 	StorageEdgegapIndex               = "_edgegap_instances_idx"
 	StorageEdgegapInstancesCollection = "_edgegap_instances"
 )
 
+// Constants representing different statuses of an Edgegap instance
 const (
-	// Constants representing different statuses of an Edgegap instance
 	EdgegapStatusRequested = "REQUESTED"
 	EdgegapStatusRunning   = "RUNNING"
 	EdgegapStatusReady     = "READY"
@@ -28,31 +28,6 @@ const (
 type StorageManager struct {
 	nk     runtime.NakamaModule
 	logger runtime.Logger
-}
-
-// updateDbInstanceSession updates an existing instance session in the database.
-func (sm *StorageManager) updateDbInstanceSession(ctx context.Context, instance *runtime.InstanceInfo) error {
-	// Sync instance metadata before updating storage
-	err := sm.SyncInstance(instance)
-	if err != nil {
-		return err
-	}
-
-	// Serialize instance data to JSON
-	value, err := json.Marshal(instance)
-	if err != nil {
-		return err
-	}
-
-	// Write updated instance to storage
-	sw := runtime.StorageWrite{
-		Collection: StorageEdgegapInstancesCollection,
-		Key:        instance.Id,
-		UserID:     "",
-		Value:      string(value),
-	}
-	_, err = sm.nk.StorageWrite(ctx, []*runtime.StorageWrite{&sw})
-	return err
 }
 
 // ExtractEdgegapInstance extracts Edgegap-related data from an instance's metadata.
@@ -95,6 +70,7 @@ func (sm *StorageManager) SyncInstance(instance *runtime.InstanceInfo) error {
 	// Update player count and available seats
 	instance.PlayerCount = len(edgegapInstance.Connections)
 	edgegapInstance.AvailableSeats = availableSeat
+	edgegapInstance.ReservationsCount = len(edgegapInstance.Reservations)
 
 	// Save updated metadata back into the instance
 	instance.Metadata["edgegap"] = edgegapInstance
@@ -118,8 +94,8 @@ func (sm *StorageManager) GetAvailableSeat(instance *runtime.InstanceInfo) (int,
 	return -1, nil
 }
 
-// createDbInstanceSession creates and stores a new instance session in the database.
-func (sm *StorageManager) createDbInstanceSession(ctx context.Context, id string, maxPlayers int, userIds []string, callbackId string, metadata map[string]any) (*runtime.InstanceInfo, error) {
+// createDbInstance creates and stores a new instance in the database.
+func (sm *StorageManager) createDbInstance(ctx context.Context, id string, maxPlayers int, userIds []string, callbackId string, metadata map[string]any) (*runtime.InstanceInfo, error) {
 	// Initialize metadata if nil
 	if metadata == nil {
 		metadata = make(map[string]any)
@@ -127,10 +103,11 @@ func (sm *StorageManager) createDbInstanceSession(ctx context.Context, id string
 
 	// Store Edgegap-related information in metadata
 	metadata["edgegap"] = EdgegapInstanceInfo{
-		MaxPlayers:   maxPlayers,
-		Reservations: userIds,
-		CallbackId:   callbackId,
-		Connections:  []string{},
+		MaxPlayers:            maxPlayers,
+		Reservations:          userIds,
+		ReservationsUpdatedAt: time.Now(),
+		CallbackId:            callbackId,
+		Connections:           []string{},
 	}
 
 	// Create a new instance session instance
@@ -166,8 +143,8 @@ func (sm *StorageManager) createDbInstanceSession(ctx context.Context, id string
 	return instance, err
 }
 
-// listDbInstanceSessions retrieves all stored instance sessions from Nakama.
-func (sm *StorageManager) listDbInstanceSessions(ctx context.Context) ([]*runtime.InstanceInfo, error) {
+// listDbInstances retrieves all stored instance from Nakama.
+func (sm *StorageManager) listDbInstances(ctx context.Context) ([]*runtime.InstanceInfo, error) {
 	instances := make([]*runtime.InstanceInfo, 0)
 	cursor := ""
 
@@ -197,8 +174,8 @@ func (sm *StorageManager) listDbInstanceSessions(ctx context.Context) ([]*runtim
 	return instances, nil
 }
 
-// getDbInstanceSession retrieves a single instance session by ID from the Nakama database.
-func (sm *StorageManager) getDbInstanceSession(ctx context.Context, id string) (*runtime.InstanceInfo, error) {
+// getDbInstance retrieves a single instance by ID from the Nakama database.
+func (sm *StorageManager) getDbInstance(ctx context.Context, id string) (*runtime.InstanceInfo, error) {
 	objects, err := sm.nk.StorageRead(ctx, []*runtime.StorageRead{{
 		Collection: StorageEdgegapInstancesCollection,
 		Key:        id,
@@ -223,8 +200,61 @@ func (sm *StorageManager) getDbInstanceSession(ctx context.Context, id string) (
 	return instance, nil
 }
 
-// deleteStorageInstanceSessions removes instance sessions from Nakama storage.
-func (sm *StorageManager) deleteStorageInstanceSessions(ctx context.Context, ids []string) error {
+// updateDbInstance updates an existing instance in the database.
+func (sm *StorageManager) updateDbInstance(ctx context.Context, instance *runtime.InstanceInfo) error {
+	// Sync instance metadata before updating storage
+	err := sm.SyncInstance(instance)
+	if err != nil {
+		return err
+	}
+
+	// Serialize instance data to JSON
+	value, err := json.Marshal(instance)
+	if err != nil {
+		return err
+	}
+
+	// Write updated instance to storage
+	sw := runtime.StorageWrite{
+		Collection: StorageEdgegapInstancesCollection,
+		Key:        instance.Id,
+		UserID:     "",
+		Value:      string(value),
+	}
+	_, err = sm.nk.StorageWrite(ctx, []*runtime.StorageWrite{&sw})
+	return err
+}
+
+// updateDbInstances updates multiple instance in the database
+func (sm *StorageManager) updateManyDbInstance(ctx context.Context, instances []*runtime.InstanceInfo) error {
+	writes := make([]*runtime.StorageWrite, 0, len(instances))
+	for _, instance := range instances {
+		err := sm.SyncInstance(instance)
+		if err != nil {
+			sm.logger.Error("Error syncing instance %v: %v", instance.Id, err)
+			continue
+		}
+		// Serialize instance data to JSON
+		value, err := json.Marshal(instance)
+		if err != nil {
+			return err
+		}
+
+		// Append for Batch Writes
+		writes = append(writes, &runtime.StorageWrite{
+			Collection: StorageEdgegapInstancesCollection,
+			Key:        instance.Id,
+			UserID:     "",
+			Value:      string(value),
+		})
+	}
+
+	_, err := sm.nk.StorageWrite(ctx, writes)
+	return err
+}
+
+// deleteDbInstance removes instance from Nakama storage.
+func (sm *StorageManager) deleteDbInstance(ctx context.Context, ids []string) error {
 	deletes := make([]*runtime.StorageDelete, 0, len(ids))
 
 	// Prepare delete requests for each session ID

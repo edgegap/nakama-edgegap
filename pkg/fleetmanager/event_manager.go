@@ -8,6 +8,7 @@ import (
 	"github.com/edgegap/nakama-edgegap/internal/helpers"
 	"github.com/heroiclabs/nakama-common/runtime"
 	"strings"
+	"time"
 )
 
 const (
@@ -66,7 +67,7 @@ func (eem *EdgegapEventManager) handleDeploymentEvent(ctx context.Context, logge
 		return "", err
 	}
 
-	instance, err := eem.sm.getDbInstanceSession(ctx, deployment.RequestId)
+	instance, err := eem.sm.getDbInstance(ctx, deployment.RequestId)
 	if err != nil {
 		return "", err
 	}
@@ -102,7 +103,7 @@ func (eem *EdgegapEventManager) handleDeploymentEvent(ctx context.Context, logge
 		fmInstance.callbackHandler.InvokeCallback(ei.CallbackId, runtime.CreateError, nil, nil, nil, errors.New("an error occurred with edgegap deployment"))
 	}
 
-	err = eem.sm.updateDbInstanceSession(ctx, instance)
+	err = eem.sm.updateDbInstance(ctx, instance)
 	if err != nil {
 		return "", err
 	}
@@ -123,7 +124,7 @@ func (eem *EdgegapEventManager) handleConnectionEvent(ctx context.Context, logge
 		return "", err
 	}
 
-	instance, err := eem.sm.getDbInstanceSession(ctx, connectionEvent.InstanceId)
+	instance, err := eem.sm.getDbInstance(ctx, connectionEvent.InstanceId)
 	if err != nil {
 		return "", err
 	}
@@ -141,9 +142,10 @@ func (eem *EdgegapEventManager) handleConnectionEvent(ctx context.Context, logge
 	newReservations := helpers.RemoveElements(edgegapInstance.Reservations, connectionEvent.Connections)
 	edgegapInstance.Reservations = newReservations
 	edgegapInstance.Connections = connectionEvent.Connections
+	edgegapInstance.ReservationsUpdatedAt = time.Now().UTC()
 	instance.Metadata["edgegap"] = edgegapInstance
 
-	err = eem.sm.updateDbInstanceSession(ctx, instance)
+	err = eem.sm.updateDbInstance(ctx, instance)
 	if err != nil {
 		return "", err
 	}
@@ -164,7 +166,7 @@ func (eem *EdgegapEventManager) handleInstanceEvent(ctx context.Context, logger 
 		return "", err
 	}
 
-	instance, err := eem.sm.getDbInstanceSession(ctx, instanceEvent.InstanceId)
+	instance, err := eem.sm.getDbInstance(ctx, instanceEvent.InstanceId)
 	if err != nil {
 		return "", err
 	}
@@ -203,7 +205,7 @@ func (eem *EdgegapEventManager) handleInstanceEvent(ctx context.Context, logger 
 		instance.Status = EdgegapStatusUnknown
 	}
 
-	err = eem.sm.updateDbInstanceSession(ctx, instance)
+	err = eem.sm.updateDbInstance(ctx, instance)
 	if err != nil {
 		return "", err
 	}

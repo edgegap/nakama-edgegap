@@ -77,7 +77,8 @@ func (efm *EdgegapFleetManager) Init(nk runtime.NakamaModule, callbackHandler ru
 	})
 
 	// Background worker to sync deployment info from Edgegap.
-	// go fm.syncInstancesWorker()
+	go efm.syncInstancesWorker()
+	go efm.runCleanupScheduler()
 
 	return nil
 }
@@ -120,7 +121,7 @@ func (efm *EdgegapFleetManager) Create(ctx context.Context, maxPlayers int, user
 	}
 
 	// Store the new instance session in the database
-	_, err = efm.storageManager.createDbInstanceSession(ctx, deployment.RequestId, maxPlayers, userIds, callbackId, metadata)
+	_, err = efm.storageManager.createDbInstance(ctx, deployment.RequestId, maxPlayers, userIds, callbackId, metadata)
 	if err != nil {
 		efm.logger.WithField("error", err).Error("failed to create Storage Instance Session")
 		efm.callbackHandler.InvokeCallback(callbackId, runtime.CreateError, nil, nil, nil, errors.New("error while creating Instance Session"))
@@ -132,7 +133,7 @@ func (efm *EdgegapFleetManager) Create(ctx context.Context, maxPlayers int, user
 
 // Get retrieves an instance session instance by its ID.
 func (efm *EdgegapFleetManager) Get(ctx context.Context, id string) (*runtime.InstanceInfo, error) {
-	return efm.storageManager.getDbInstanceSession(ctx, id)
+	return efm.storageManager.getDbInstance(ctx, id)
 }
 
 // List retrieves instance session instances based on a query, sorted by player count and creation time.
@@ -160,7 +161,7 @@ func (efm *EdgegapFleetManager) Join(ctx context.Context, id string, userIds []s
 		return nil, errors.New("expects id to be a valid InstanceSessionId")
 	}
 
-	instance, err := efm.storageManager.getDbInstanceSession(ctx, id)
+	instance, err := efm.storageManager.getDbInstance(ctx, id)
 	if err != nil {
 		return nil, errors.New("instance not found")
 	}
@@ -197,7 +198,7 @@ func (efm *EdgegapFleetManager) Join(ctx context.Context, id string, userIds []s
 	instance.Metadata["edgegap"] = edgegapInstance
 
 	// Update the instance session in the database
-	err = efm.storageManager.updateDbInstanceSession(ctx, instance)
+	err = efm.storageManager.updateDbInstance(ctx, instance)
 	if err != nil {
 		return nil, errors.New("error updating db instance session")
 	}
@@ -207,7 +208,7 @@ func (efm *EdgegapFleetManager) Join(ctx context.Context, id string, userIds []s
 
 // Update modifies an instance session's player count and metadata.
 func (efm *EdgegapFleetManager) Update(ctx context.Context, id string, playerCount int, metadata map[string]any) error {
-	instance, err := efm.storageManager.getDbInstanceSession(ctx, id)
+	instance, err := efm.storageManager.getDbInstance(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to read instance info from db: %s", err.Error())
 	}
@@ -215,7 +216,7 @@ func (efm *EdgegapFleetManager) Update(ctx context.Context, id string, playerCou
 	efm.logger.Warn("Player Count should not be updated manually and only from the Instance Server SDK")
 	instance.PlayerCount = playerCount
 
-	return efm.storageManager.updateDbInstanceSession(ctx, instance)
+	return efm.storageManager.updateDbInstance(ctx, instance)
 }
 
 // Delete removes an instance session from the database.
@@ -224,7 +225,7 @@ func (efm *EdgegapFleetManager) Delete(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	return efm.storageManager.deleteStorageInstanceSessions(ctx, []string{id})
+	return efm.storageManager.deleteDbInstance(ctx, []string{id})
 }
 
 func (efm *EdgegapFleetManager) syncInstancesWorker() {
@@ -236,7 +237,7 @@ func (efm *EdgegapFleetManager) syncInstancesWorker() {
 		}
 		efm.logger.WithField("active_deployments", len(deployments)).Debug("fetched active deployment instances list")
 
-		dbInstances, err := efm.storageManager.listDbInstanceSessions(efm.ctx)
+		dbInstances, err := efm.storageManager.listDbInstances(efm.ctx)
 		if err != nil {
 			efm.logger.WithField("error", err.Error()).Error("failed to read instances from db")
 			return
@@ -254,11 +255,14 @@ func (efm *EdgegapFleetManager) syncInstancesWorker() {
 			}
 		}
 
-		if err = efm.storageManager.deleteStorageInstanceSessions(efm.ctx, instancesToRemove); err != nil {
-			efm.logger.WithField("error", err.Error()).Error("failed to delete a game instances")
-			return
-		}
+		if len(instancesToRemove) > 0 {
+			efm.logger.Debug("Found %d instances to remove", len(instancesToRemove))
 
+			if err = efm.storageManager.deleteDbInstance(efm.ctx, instancesToRemove); err != nil {
+				efm.logger.WithField("error", err.Error()).Error("failed to delete a game instances")
+				return
+			}
+		}
 	}
 
 	deleteTerminatedInstancesFn()
@@ -269,12 +273,79 @@ func (efm *EdgegapFleetManager) syncInstancesWorker() {
 		duration = 15 * time.Minute
 	}
 	t := time.NewTicker(duration)
+	efm.logger.Info("Starting Instance Worker for Sync")
 	for {
 		select {
 		case <-efm.ctx.Done():
 			return
 		case <-t.C:
 			deleteTerminatedInstancesFn()
+		}
+	}
+}
+
+func (efm *EdgegapFleetManager) runCleanupScheduler() {
+	reservationMaxDuration, err := time.ParseDuration(efm.edgegapManager.configuration.ReservationMaxDuration)
+	if err != nil {
+		efm.logger.WithField("error", err.Error()).Error("failed to parse reservation max duration, defaulting to 1m")
+		reservationMaxDuration = 1 * time.Minute
+	}
+
+	cleanupFn := func() {
+		// Remove the Max Duration to get the expired timestamp of reservations
+		searchTime := time.Now().UTC().Add(-reservationMaxDuration)
+		query := fmt.Sprintf("+value.metadata.edgegap.reservations_count:>0 +value.metadata.edgegap.reservations_updated_at:<\"%s\"", searchTime.Format(time.RFC3339))
+		cursor := ""
+		entries, _, err := efm.nk.StorageIndexList(efm.ctx, "", StorageEdgegapIndex, query, 1_000, nil, cursor)
+		if err != nil {
+			efm.logger.WithField("error", err.Error()).Error("failed to list expired reservations instance")
+			return
+		}
+
+		results := make([]*runtime.InstanceInfo, 0)
+		objects := entries.GetObjects()
+		if len(objects) > 0 {
+			efm.logger.Debug("Found %d Reservations Instance to cleanup", len(objects))
+			for _, so := range objects {
+				var info *runtime.InstanceInfo
+				if err = json.Unmarshal([]byte(so.Value), &info); err != nil {
+					efm.logger.WithField("error", err.Error()).Error("failed to unmarshal instance info")
+					continue
+				}
+				edgegapInstance, err := efm.storageManager.ExtractEdgegapInstance(info)
+				if err != nil {
+					efm.logger.WithField("error", err.Error()).Error("failed to extract edge gap instance")
+					continue
+				}
+				edgegapInstance.ReservationsUpdatedAt = time.Now().UTC()
+				edgegapInstance.Reservations = []string{}
+				info.Metadata["edgegap"] = edgegapInstance
+				results = append(results, info)
+			}
+
+			err = efm.storageManager.updateManyDbInstance(efm.ctx, results)
+			if err != nil {
+				efm.logger.WithField("error", err.Error()).Error("failed to update expired reservations instance")
+			}
+		}
+	}
+
+	cleanupFn()
+
+	duration, err := time.ParseDuration(efm.edgegapManager.configuration.CleanupInterval)
+	if err != nil {
+		efm.logger.WithField("error", err.Error()).Error("failed to parse cleanup interval, defaulting to 30s")
+		duration = 30 * time.Second
+	}
+	t := time.NewTicker(duration)
+
+	efm.logger.Info("Starting cleanup scheduler")
+	for {
+		select {
+		case <-efm.ctx.Done():
+			return
+		case <-t.C:
+			cleanupFn()
 		}
 	}
 }

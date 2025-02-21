@@ -12,15 +12,17 @@ import (
 )
 
 type EdgegapManagerConfiguration struct {
-	NakamaNode      string `json:"nakama_node"`
-	ApiUrl          string `json:"base_url"`
-	ApiToken        string `json:"api_token"`
-	Application     string `json:"application"`
-	Version         string `json:"version"`
-	PortName        string `json:"port_name"`
-	NakamaAccessUrl string `json:"nakama_access_url"`
-	NakamaHttpKey   string `json:"nakama_http_key"`
-	PollingInterval string `json:"polling_interval"`
+	NakamaNode             string `json:"nakama_node"`
+	ApiUrl                 string `json:"base_url"`
+	ApiToken               string `json:"api_token"`
+	Application            string `json:"application"`
+	Version                string `json:"version"`
+	PortName               string `json:"port_name"`
+	NakamaAccessUrl        string `json:"nakama_access_url"`
+	NakamaHttpKey          string `json:"nakama_http_key"`
+	PollingInterval        string `json:"polling_interval"`
+	CleanupInterval        string `json:"cleanup_interval"`
+	ReservationMaxDuration string `json:"reservation_max_duration"`
 }
 
 // NewEdgegapManagerConfiguration Create New Edgegap EdgegapManager Configuration and Fail if missing values
@@ -69,15 +71,27 @@ func NewEdgegapManagerConfiguration(ctx context.Context) (*EdgegapManagerConfigu
 		pollingInterval = "15m"
 	}
 
+	cleanupInterval, ok := env["NAKAMA_CLEANUP_INTERVAL"]
+	if !ok {
+		cleanupInterval = "1m"
+	}
+
+	reservationMaxDuration, ok := env["NAKAMA_RESERVATION_MAX_DURATION"]
+	if !ok {
+		reservationMaxDuration = "30s"
+	}
+
 	mc := EdgegapManagerConfiguration{
-		NakamaNode:      nakamaNode,
-		ApiUrl:          url,
-		ApiToken:        token,
-		Application:     app,
-		Version:         version,
-		PortName:        portName,
-		NakamaAccessUrl: nakamaAccessUrl,
-		PollingInterval: pollingInterval,
+		NakamaNode:             nakamaNode,
+		ApiUrl:                 url,
+		ApiToken:               token,
+		Application:            app,
+		Version:                version,
+		PortName:               portName,
+		NakamaAccessUrl:        nakamaAccessUrl,
+		PollingInterval:        pollingInterval,
+		CleanupInterval:        cleanupInterval,
+		ReservationMaxDuration: reservationMaxDuration,
 	}
 
 	err := mc.Validate()
@@ -122,6 +136,14 @@ func (emc *EdgegapManagerConfiguration) Validate() error {
 
 	if _, err := time.ParseDuration(emc.PollingInterval); err != nil {
 		errs = append(errs, errors.New("invalid polling interval: "+emc.PollingInterval))
+	}
+
+	if _, err := time.ParseDuration(emc.CleanupInterval); err != nil {
+		errs = append(errs, errors.New("invalid cleanup interval: "+emc.CleanupInterval))
+	}
+
+	if _, err := time.ParseDuration(emc.ReservationMaxDuration); err != nil {
+		errs = append(errs, errors.New("invalid reservation max duration: "+emc.ReservationMaxDuration))
 	}
 
 	// Check with Edgegap if App Version Exists while testing the Token and the URL of the API

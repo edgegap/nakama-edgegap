@@ -1,16 +1,20 @@
 package fleetmanager
 
+import "time"
+
 const (
 	DeploymentStatusReady = "Status.READY"
 	DeploymentStatusError = "Status.ERROR"
 )
 
 type EdgegapInstanceInfo struct {
-	MaxPlayers     int      `json:"max_players"`
-	AvailableSeats int      `json:"available_seats"`
-	CallbackId     string   `json:"callback_id"`
-	Reservations   []string `json:"reservations"`
-	Connections    []string `json:"connections"`
+	MaxPlayers            int       `json:"max_players"`
+	AvailableSeats        int       `json:"available_seats"`
+	CallbackId            string    `json:"callback_id"`
+	Reservations          []string  `json:"reservations"`
+	ReservationsCount     int       `json:"reservations_count"`
+	ReservationsUpdatedAt time.Time `json:"reservations_updated_at"`
+	Connections           []string  `json:"connections"`
 }
 
 type EdgegapDeploymentUser struct {
