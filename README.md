@@ -31,6 +31,8 @@ NAKAMA_ACCESS_URL=<Nakama API Url, for Heroic Cloud, it will be provided when yo
 
 You can copy the `local.yml.example` to `local.yml` and fill it out to start with your local cluster
 
+Make sure the `NAKAMA_ACCESS_URL` is prefixed with `https://`.
+
 Optional Values with default
 ```shell
 EDGEGAP_POLLING_INTERVAL=<Interval where Nakama will sync with Edgegap API in case of mistmach (default:15m ) >
@@ -98,6 +100,11 @@ injected.
 It's the responsibility of the Dedicated Game Server to fire lifecycle events when specific actions are triggered to communicate
 back to Nakama's cluster changes regarding the Instance (Nakama's reference to an Edgegap Deployment) and facilitate Player connections to
 the Dedicated Game Server.
+
+### Unity Server Plugin
+
+Automate all server responsibilities (instance and connection event reporting) by using our
+[Edgegap Server Nakama Plugin for Unity](https://github.com/edgegap/edgegap-server-nakama-plugin-unity).
 
 ### Injected Environment Variables
 
@@ -312,3 +319,6 @@ if err != nil {
 ## Support and Troubleshooting
 
 For Edgegap-related questions and reports, please reach out to us over our [Community Discord](http://discord.gg/MmJf8fWjnt) and include your deployment ID if possible.
+
+`Error invoking RPC call: OK` or `invalid memory address or nil pointer dereference - nakama-edgegap/pkg/fleetmanager.createInstanceSession.func1`
+- Using Nakama to launch Edgegap servers currently requires [upgrading to Edgegap pay as you go tier](https://app.edgegap.com/user-settings?tab=memberships).
