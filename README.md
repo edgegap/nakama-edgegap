@@ -319,6 +319,3 @@ if err != nil {
 ## Support and Troubleshooting
 
 For Edgegap-related questions and reports, please reach out to us over our [Community Discord](http://discord.gg/MmJf8fWjnt) and include your deployment ID if possible.
-
-`Error invoking RPC call: OK` or `invalid memory address or nil pointer dereference - nakama-edgegap/pkg/fleetmanager.createInstanceSession.func1`
-- Using Nakama to launch Edgegap servers currently requires [upgrading to Edgegap pay as you go tier](https://app.edgegap.com/user-settings?tab=memberships).
