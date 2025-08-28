@@ -38,7 +38,7 @@ func NewEdgegapFleetManager(ctx context.Context, logger runtime.Logger, db *sql.
 	}
 
 	// Initialize Edgegap Manager
-	em, err := NewEdgegapManager(ctx, logger, initializer, sm)
+	em, err := NewEdgegapManager(ctx, logger, initializer, sm, nk)
 	if err != nil {
 		return nil, err
 	}

@@ -17,6 +17,7 @@ type EdgegapManagerConfiguration struct {
 	ApiToken               string `json:"api_token"`
 	Application            string `json:"application"`
 	Version                string `json:"version"`
+	DynamicVersioning      bool   `json:"dynamic_versioning"`
 	PortName               string `json:"port_name"`
 	NakamaAccessUrl        string `json:"nakama_access_url"`
 	NakamaHttpKey          string `json:"nakama_http_key"`
@@ -51,9 +52,22 @@ func NewEdgegapManagerConfiguration(ctx context.Context) (*EdgegapManagerConfigu
 		return nil, runtime.NewError("EDGEGAP_APPLICATION not found in environment", 3)
 	}
 
-	version, ok := env["EDGEGAP_VERSION"]
-	if !ok {
-		return nil, runtime.NewError("EDGEGAP_VERSION not found in environment", 3)
+	// Check if dynamic versioning is enabled
+	dynamicVersioning := false
+	if dynamicVersioningStr, ok := env["EDGEGAP_DYNAMIC_VERSIONING"]; ok {
+		dynamicVersioning = strings.ToLower(dynamicVersioningStr) == "true" || dynamicVersioningStr == "1"
+	}
+
+	var version string
+	if dynamicVersioning {
+		// Dynamic versioning enabled - version will be loaded from storage
+		version = "DYNAMIC"
+	} else {
+		// Static versioning - require EDGEGAP_VERSION environment variable
+		version, ok = env["EDGEGAP_VERSION"]
+		if !ok {
+			return nil, runtime.NewError("EDGEGAP_VERSION not found in environment (set EDGEGAP_DYNAMIC_VERSIONING=true to use dynamic versioning)", 3)
+		}
 	}
 
 	portName, ok := env["EDGEGAP_PORT_NAME"]
@@ -87,6 +101,7 @@ func NewEdgegapManagerConfiguration(ctx context.Context) (*EdgegapManagerConfigu
 		ApiToken:               token,
 		Application:            app,
 		Version:                version,
+		DynamicVersioning:      dynamicVersioning,
 		PortName:               portName,
 		NakamaAccessUrl:        nakamaAccessUrl,
 		PollingInterval:        pollingInterval,
@@ -146,15 +161,19 @@ func (emc *EdgegapManagerConfiguration) Validate() error {
 		errs = append(errs, errors.New("invalid reservation max duration: "+emc.ReservationMaxDuration))
 	}
 
-	// Check with Edgegap if App Version Exists while testing the Token and the URL of the API
-	apiHelper := helpers.NewAPIClient(emc.ApiUrl, emc.ApiToken)
-	reply, err := apiHelper.Get(fmt.Sprintf("/v1/app/%s/version/%s", emc.Application, emc.Version))
-	if err != nil {
-		errs = append(errs, errors.New(fmt.Sprintf("Failed to get version from Edgegap API, this can happens if the URL is wrong: %s", err.Error())))
-	}
+	// For static versioning, validate the version at startup
+	// For dynamic versioning, validation happens when setting the version via update_edgegap_version RPC
+	if !emc.DynamicVersioning {
+		// Check with Edgegap if App Version Exists while testing the Token and the URL of the API
+		apiHelper := helpers.NewAPIClient(emc.ApiUrl, emc.ApiToken)
+		reply, err := apiHelper.Get(fmt.Sprintf("/v1/app/%s/version/%s", emc.Application, emc.Version))
+		if err != nil {
+			errs = append(errs, errors.New(fmt.Sprintf("Failed to get version from Edgegap API, this can happens if the URL is wrong: %s", err.Error())))
+		}
 
-	if reply != nil && reply.StatusCode != http.StatusOK {
-		errs = append(errs, errors.New(fmt.Sprintf("Failed to validate version from Edgegap API, check token and if the Application/Version combo exists - Status Code=%s", reply.Status)))
+		if reply != nil && reply.StatusCode != http.StatusOK {
+			errs = append(errs, errors.New(fmt.Sprintf("Failed to validate version from Edgegap API, check token and if the Application/Version combo exists - Status Code=%s", reply.Status)))
+		}
 	}
 
 	if len(errs) > 0 {

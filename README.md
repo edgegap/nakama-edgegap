@@ -24,7 +24,8 @@ You must set up the following Environment Variable inside your Nakama's cluster:
 EDGEGAP_API_URL=https://api.edgegap.com
 EDGEGAP_API_TOKEN=<The Edgegap's API Token (keep the 'token' in the API Token)>
 EDGEGAP_APPLICATION=<The Edgegap's Application Name to use to deploy>
-EDGEGAP_VERSION=<The Edgegap's Version Name to use to deploy>
+EDGEGAP_VERSION=<The Edgegap's Version Name to use to deploy>  # Required if EDGEGAP_DYNAMIC_VERSIONING is not set to true
+EDGEGAP_DYNAMIC_VERSIONING=<true|false>  # Optional: Enable dynamic versioning from storage (default: false)
 EDGEGAP_PORT_NAME=<The Edgegap's Application Port Name to send to game client>
 NAKAMA_ACCESS_URL=<Nakama API Url, for Heroic Cloud, it will be provided when you create your instance>
 ```
@@ -39,6 +40,70 @@ EDGEGAP_POLLING_INTERVAL=<Interval where Nakama will sync with Edgegap API in ca
 NAKAMA_CLEANUP_INTERVAL=<Interval where Nakama will check reservations expiration (default:1m )
 NAKAMA_RESERVATION_MAX_DURATION=<Max Duration of a reservations before it expires (default:30s )
 ```
+
+### Dynamic Versioning
+
+When `EDGEGAP_DYNAMIC_VERSIONING` is set to `true`, the plugin will read the Edgegap deployment version from Nakama storage instead of the environment variable. This allows you to update the version at runtime without restarting services.
+
+To use dynamic versioning:
+1. Set `EDGEGAP_DYNAMIC_VERSIONING=true` in your environment
+2. Use the built-in Server-to-Server (S2S) RPCs to manage the version
+
+#### Update Version (S2S only)
+Updates the Edgegap deployment version after validating it exists in the Edgegap application.
+
+```bash
+curl -X POST http://localhost:7350/v2/rpc/update_edgegap_version?http_key=<http-key>&unwrap \
+  -H "Content-Type: application/json" \
+  -d '{"version": "your-version-here"}'
+```
+
+Success Response:
+```json
+{
+  "success": true,
+  "version": "your-version-here",
+  "message": "Edgegap version updated successfully. Will be used for new deployments immediately."
+}
+```
+
+Error Response (invalid version):
+```json
+{
+  "code": 5,
+  "message": "version 'invalid-version' does not exist for application 'YourApp'"
+}
+```
+
+#### Get Current Version (S2S only)
+```bash
+curl -X POST http://localhost:7350/v2/rpc/get_edgegap_version?http_key=<http-key>&unwrap \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+Response (dynamic mode):
+```json
+{
+  "dynamic_versioning": true,
+  "version": "your-version-here",
+  "source": "storage",
+  "updated_at": 1735844393
+}
+```
+
+Response (static mode):
+```json
+{
+  "dynamic_versioning": false,
+  "version": "sample",
+  "source": "environment"
+}
+```
+
+**Note**: Both RPCs require HTTP key authentication and cannot be called by game clients.
+
+When dynamic versioning is disabled (default), the `EDGEGAP_VERSION` environment variable is required and will be used for all deployments.
 
 Using the Nakama's Storage Index and basic struct Instance Info,
 we store extra information in the metadata for Edgegap using 2 list.
@@ -315,6 +380,25 @@ if err != nil {
     return err
 }
 ```
+
+## Testing
+
+### Test Scripts
+The `scripts/` directory contains utility scripts for testing the dynamic versioning feature locally.
+
+Quick start:
+```bash
+# Start the environment
+docker compose up -d
+
+# Get current version
+./scripts/test_get_version.bat
+
+# Update version
+./scripts/test_update_version.bat "v1.0.0"
+```
+
+See [scripts/README.md](scripts/README.md) for detailed usage instructions.
 
 ## Support and Troubleshooting
 

@@ -14,15 +14,17 @@ import (
 )
 
 type EdgegapManager struct {
-	configuration *EdgegapManagerConfiguration
-	apiHelper     *helpers.APIClient
-	logger        runtime.Logger
+	configuration   *EdgegapManagerConfiguration
+	apiHelper       *helpers.APIClient
+	logger          runtime.Logger
+	storageManager  *StorageManager
+	nk              runtime.NakamaModule
 }
 
 // NewEdgegapManager initializes a new EdgegapManager instance.
 // It retrieves the configuration from environment variables, sets up API access,
 // and registers necessary RPC functions.
-func NewEdgegapManager(ctx context.Context, logger runtime.Logger, initializer runtime.Initializer, sm *StorageManager) (*EdgegapManager, error) {
+func NewEdgegapManager(ctx context.Context, logger runtime.Logger, initializer runtime.Initializer, sm *StorageManager, nk runtime.NakamaModule) (*EdgegapManager, error) {
 	// Get the Configuration from Environment Variables
 	configuration, err := NewEdgegapManagerConfiguration(ctx)
 	if err != nil {
@@ -50,6 +52,9 @@ func NewEdgegapManager(ctx context.Context, logger runtime.Logger, initializer r
 		RpcIdInstanceSessionGet:    getInstanceSession,
 		RpcIdInstanceSessionJoin:   joinInstanceSession,
 		RpcIdInstanceSessionList:   listInstanceSession,
+		// S2S RPCs for managing Edgegap version (only works when EDGEGAP_DYNAMIC_VERSIONING=true)
+		RpcIdUpdateEdgegapVersion:  UpdateEdgegapVersionRpc,
+		RpcIdGetEdgegapVersion:     GetEdgegapVersionRpc,
 	}
 
 	// Register each RPC function with the Nakama runtime
@@ -61,9 +66,11 @@ func NewEdgegapManager(ctx context.Context, logger runtime.Logger, initializer r
 	}
 
 	return &EdgegapManager{
-		configuration: configuration,
-		apiHelper:     helpers.NewAPIClient(configuration.ApiUrl, configuration.ApiToken),
-		logger:        logger,
+		configuration:  configuration,
+		apiHelper:      helpers.NewAPIClient(configuration.ApiUrl, configuration.ApiToken),
+		logger:         logger,
+		storageManager: sm,
+		nk:             nk,
 	}, nil
 }
 
@@ -130,10 +137,24 @@ func (em *EdgegapManager) getDeploymentCreation(usersIP []string, metadata map[s
 		return nil, err
 	}
 
+	// Get the Edgegap version based on configuration mode
+	var version string
+	if em.configuration.DynamicVersioning {
+		// Dynamic mode - get version from storage
+		var err error
+		version, err = em.getEdgegapVersion()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get Edgegap version from storage: %w", err)
+		}
+	} else {
+		// Static mode - use version from configuration
+		version = em.configuration.Version
+	}
+
 	// Construct deployment request payload
 	return &EdgegapDeploymentCreation{
 		ApplicationName: em.configuration.Application,
-		Version:         em.configuration.Version,
+		Version:         version,
 		Users:           users,
 		EnvironmentVariables: []EdgegapEnvironmentVariable{
 			{
@@ -223,4 +244,45 @@ func (em *EdgegapManager) ListAllDeployments() ([]EdgegapDeploymentSummary, erro
 	}
 
 	return allDeployments, nil
+}
+
+// Storage constants for Edgegap version
+const (
+	StorageCollectionEdgegapVersion = "system"
+	StorageKeyEdgegapVersion        = "edgegap_version"
+)
+
+// getEdgegapVersion retrieves the Edgegap version from storage
+func (em *EdgegapManager) getEdgegapVersion() (string, error) {
+	ctx := context.Background()
+	
+	// Read version from storage
+	objects, err := em.nk.StorageRead(ctx, []*runtime.StorageRead{
+		{
+			Collection: StorageCollectionEdgegapVersion,
+			Key:        StorageKeyEdgegapVersion,
+		},
+	})
+	
+	if err != nil {
+		return "", fmt.Errorf("failed to read Edgegap version from storage: %w", err)
+	}
+	
+	if len(objects) == 0 {
+		return "", errors.New("no Edgegap version found in storage - please set version using update_edgegap_version RPC")
+	}
+	
+	// Parse stored version
+	var storedData map[string]interface{}
+	if err := json.Unmarshal([]byte(objects[0].Value), &storedData); err != nil {
+		return "", fmt.Errorf("failed to parse stored Edgegap version: %w", err)
+	}
+	
+	version, ok := storedData["version"].(string)
+	if !ok || version == "" {
+		return "", errors.New("invalid Edgegap version format in storage")
+	}
+	
+	em.logger.Debug("Using Edgegap version from storage: %s", version)
+	return version, nil
 }

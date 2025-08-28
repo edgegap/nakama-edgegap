@@ -8,11 +8,13 @@ socket:
   max_message_size_bytes: 4096 # reserved buffer
   max_request_size_bytes: 131072
 runtime:
+  http_key: "testkey123"  # HTTP key for S2S authentication (matches test scripts)
   env:
     - "EDGEGAP_API_URL=https://api.edgegap.com"
     - "EDGEGAP_API_TOKEN=token changeme"
     - "EDGEGAP_APPLICATION=nakama"
-    - "EDGEGAP_VERSION=sample"
+    - "EDGEGAP_VERSION=sample"  # Required if EDGEGAP_DYNAMIC_VERSIONING is not true
+    # - "EDGEGAP_DYNAMIC_VERSIONING=false"  # Set to true to enable dynamic versioning from storage
     - "EDGEGAP_PORT_NAME=game"
     - "NAKAMA_ACCESS_URL=https://changeme.nakamacloud.io"
     # - "EDGEGAP_POLLING_INTERVAL=15m"
