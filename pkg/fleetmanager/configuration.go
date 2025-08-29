@@ -55,7 +55,7 @@ func NewEdgegapManagerConfiguration(ctx context.Context) (*EdgegapManagerConfigu
 	// Check if dynamic versioning is enabled
 	dynamicVersioning := false
 	if dynamicVersioningStr, ok := env["EDGEGAP_DYNAMIC_VERSIONING"]; ok {
-		dynamicVersioning = strings.ToLower(dynamicVersioningStr) == "true" || dynamicVersioningStr == "1"
+		dynamicVersioning, _ = strconv.ParseBool(dynamicVersioningStr)
 	}
 
 	var version string
