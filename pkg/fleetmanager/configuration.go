@@ -7,6 +7,7 @@ import (
 	"github.com/edgegap/nakama-edgegap/internal/helpers"
 	"github.com/heroiclabs/nakama-common/runtime"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -55,7 +56,12 @@ func NewEdgegapManagerConfiguration(ctx context.Context) (*EdgegapManagerConfigu
 	// Check if dynamic versioning is enabled
 	dynamicVersioning := false
 	if dynamicVersioningStr, ok := env["EDGEGAP_DYNAMIC_VERSIONING"]; ok {
-		dynamicVersioning = strings.ToLower(dynamicVersioningStr) == "true" || dynamicVersioningStr == "1"
+		var err error
+		dynamicVersioning, err = strconv.ParseBool(dynamicVersioningStr)
+		if err != nil {
+			// Default to false if parsing fails
+			dynamicVersioning = false
+		}
 	}
 
 	var version string

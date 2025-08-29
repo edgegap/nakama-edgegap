@@ -53,8 +53,8 @@ func NewEdgegapManager(ctx context.Context, logger runtime.Logger, initializer r
 		RpcIdInstanceSessionJoin:   joinInstanceSession,
 		RpcIdInstanceSessionList:   listInstanceSession,
 		// S2S RPCs for managing Edgegap version (only works when EDGEGAP_DYNAMIC_VERSIONING=true)
-		RpcIdUpdateEdgegapVersion:  UpdateEdgegapVersionRpc,
-		RpcIdGetEdgegapVersion:     GetEdgegapVersionRpc,
+		RpcIdUpdateEdgegapVersion:  updateEdgegapVersion,
+		RpcIdGetEdgegapVersion:     getEdgegapVersion,
 	}
 
 	// Register each RPC function with the Nakama runtime

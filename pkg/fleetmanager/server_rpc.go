@@ -9,6 +9,7 @@ import (
 	"github.com/edgegap/nakama-edgegap/internal/helpers"
 	"github.com/heroiclabs/nakama-common/runtime"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -21,8 +22,14 @@ type UpdateEdgegapVersionRequest struct {
 	Version string `json:"version"`
 }
 
-// UpdateEdgegapVersionRpc updates the Edgegap deployment version in storage (S2S only)
-func UpdateEdgegapVersionRpc(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+// updateEdgegapVersion updates the Edgegap deployment version in storage (S2S only)
+// Error codes used map to HTTP status codes via Nakama:
+// - 3 (INVALID_ARGUMENT) → 400 Bad Request
+// - 5 (NOT_FOUND) → 404 Not Found
+// - 7 (PERMISSION_DENIED) → 403 Forbidden
+// - 9 (FAILED_PRECONDITION) → 400 Bad Request
+// - 13 (INTERNAL) → 500 Internal Server Error
+func updateEdgegapVersion(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	// This RPC should only be called by servers with HTTP key authentication, not by game clients
 	// Nakama automatically validates the HTTP key when the Authorization header is provided
 	// If we reach this point with a user ID, it means a client is trying to call this RPC
@@ -38,7 +45,7 @@ func UpdateEdgegapVersionRpc(ctx context.Context, logger runtime.Logger, db *sql
 
 	// Validate version is not empty
 	if request.Version == "" {
-		return "", errors.New("version cannot be empty")
+		return "", runtime.NewError("version cannot be empty", 3) // INVALID_ARGUMENT
 	}
 
 	// Check if dynamic versioning is enabled
@@ -49,7 +56,12 @@ func UpdateEdgegapVersionRpc(ctx context.Context, logger runtime.Logger, db *sql
 
 	dynamicVersioning := false
 	if dynamicVersioningStr, ok := env["EDGEGAP_DYNAMIC_VERSIONING"]; ok {
-		dynamicVersioning = dynamicVersioningStr == "true" || dynamicVersioningStr == "1"
+		var err error
+		dynamicVersioning, err = strconv.ParseBool(dynamicVersioningStr)
+		if err != nil {
+			// Default to false if parsing fails
+			dynamicVersioning = false
+		}
 	}
 
 	if !dynamicVersioning {
@@ -121,8 +133,8 @@ func UpdateEdgegapVersionRpc(ctx context.Context, logger runtime.Logger, db *sql
 	return string(responseBytes), nil
 }
 
-// GetEdgegapVersionRpc retrieves the current Edgegap version configuration (S2S only)
-func GetEdgegapVersionRpc(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+// getEdgegapVersion retrieves the current Edgegap version configuration (S2S only)
+func getEdgegapVersion(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	// This RPC can be called by servers with HTTP key authentication
 	// If we reach this point with a user ID, it means a client is trying to call this RPC
 	if _, ok := ctx.Value(runtime.RUNTIME_CTX_USER_ID).(string); ok {
@@ -138,7 +150,12 @@ func GetEdgegapVersionRpc(ctx context.Context, logger runtime.Logger, db *sql.DB
 
 	dynamicVersioning := false
 	if dynamicVersioningStr, ok := env["EDGEGAP_DYNAMIC_VERSIONING"]; ok {
-		dynamicVersioning = dynamicVersioningStr == "true" || dynamicVersioningStr == "1"
+		var err error
+		dynamicVersioning, err = strconv.ParseBool(dynamicVersioningStr)
+		if err != nil {
+			// Default to false if parsing fails
+			dynamicVersioning = false
+		}
 	}
 
 	response := map[string]interface{}{
@@ -156,7 +173,7 @@ func GetEdgegapVersionRpc(ctx context.Context, logger runtime.Logger, db *sql.DB
 		
 		if err != nil {
 			logger.Error("Failed to read Edgegap version from storage: %v", err)
-			return "", fmt.Errorf("failed to read Edgegap version: %w", err)
+			return "", runtime.NewError(fmt.Sprintf("failed to read Edgegap version: %v", err), 13) // INTERNAL
 		} else if len(objects) == 0 {
 			// No version set yet
 			response["error"] = "No Edgegap version configured"
@@ -166,16 +183,16 @@ func GetEdgegapVersionRpc(ctx context.Context, logger runtime.Logger, db *sql.DB
 			var storedData map[string]interface{}
 			if err := json.Unmarshal([]byte(objects[0].Value), &storedData); err != nil {
 				logger.Error("Failed to parse stored Edgegap version: %v", err)
-				return "", fmt.Errorf("failed to parse stored version: %w", err)
+				return "", runtime.NewError(fmt.Sprintf("failed to parse stored version: %v", err), 13) // INTERNAL
 			}
 			
 			version, ok := storedData["version"].(string)
 			if !ok || version == "" {
-				return "", errors.New("invalid Edgegap version format in storage")
+				return "", runtime.NewError("invalid Edgegap version format in storage", 13) // INTERNAL
 			}
 			
 			response["version"] = version
-			response["source"] = "storage"
+			response["source"] = "dynamic"
 			
 			// Also get the updated_at timestamp if available
 			if updatedAt, ok := storedData["updated_at"].(float64); ok {
@@ -186,7 +203,7 @@ func GetEdgegapVersionRpc(ctx context.Context, logger runtime.Logger, db *sql.DB
 		// Static mode - return environment variable
 		if version, ok := env["EDGEGAP_VERSION"]; ok {
 			response["version"] = version
-			response["source"] = "environment"
+			response["source"] = "static"
 		} else {
 			response["error"] = "EDGEGAP_VERSION environment variable not set"
 		}
