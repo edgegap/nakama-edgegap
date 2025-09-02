@@ -13,8 +13,7 @@ runtime:
     - "EDGEGAP_API_URL=https://api.edgegap.com"
     - "EDGEGAP_API_TOKEN=token changeme"
     - "EDGEGAP_APPLICATION=nakama"
-    - "EDGEGAP_VERSION=sample"  # Required if EDGEGAP_DYNAMIC_VERSIONING is not true
-    # - "EDGEGAP_DYNAMIC_VERSIONING=false"  # Set to true to enable dynamic versioning from storage
+    - "INITIAL_EDGEGAP_VERSION=sample"  # Initial version to use when no version exists in storage (required for first deployment)
     - "EDGEGAP_PORT_NAME=game"
     - "NAKAMA_ACCESS_URL=https://changeme.nakamacloud.io"
     # - "EDGEGAP_POLLING_INTERVAL=15m"

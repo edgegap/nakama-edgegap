@@ -7,7 +7,6 @@ import (
 	"github.com/edgegap/nakama-edgegap/internal/helpers"
 	"github.com/heroiclabs/nakama-common/runtime"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -17,8 +16,7 @@ type EdgegapManagerConfiguration struct {
 	ApiUrl                 string `json:"base_url"`
 	ApiToken               string `json:"api_token"`
 	Application            string `json:"application"`
-	Version                string `json:"version"`
-	DynamicVersioning      bool   `json:"dynamic_versioning"`
+	InitialVersion         string `json:"initial_version"`
 	PortName               string `json:"port_name"`
 	NakamaAccessUrl        string `json:"nakama_access_url"`
 	NakamaHttpKey          string `json:"nakama_http_key"`
@@ -53,22 +51,12 @@ func NewEdgegapManagerConfiguration(ctx context.Context) (*EdgegapManagerConfigu
 		return nil, runtime.NewError("EDGEGAP_APPLICATION not found in environment", 3)
 	}
 
-	// Check if dynamic versioning is enabled
-	dynamicVersioning := false
-	if dynamicVersioningStr, ok := env["EDGEGAP_DYNAMIC_VERSIONING"]; ok {
-		dynamicVersioning, _ = strconv.ParseBool(dynamicVersioningStr)
-	}
-
-	var version string
-	if dynamicVersioning {
-		// Dynamic versioning enabled - version will be loaded from storage
-		version = "DYNAMIC"
-	} else {
-		// Static versioning - require EDGEGAP_VERSION environment variable
-		version, ok = env["EDGEGAP_VERSION"]
-		if !ok {
-			return nil, runtime.NewError("EDGEGAP_VERSION not found in environment (set EDGEGAP_DYNAMIC_VERSIONING=true to use dynamic versioning)", 3)
-		}
+	// Get initial version (optional, used when no version exists in storage)
+	initialVersion := env["INITIAL_EDGEGAP_VERSION"]
+	
+	// For backward compatibility, check EDGEGAP_VERSION if INITIAL_EDGEGAP_VERSION is not set
+	if initialVersion == "" {
+		initialVersion = env["EDGEGAP_VERSION"]
 	}
 
 	portName, ok := env["EDGEGAP_PORT_NAME"]
@@ -101,8 +89,7 @@ func NewEdgegapManagerConfiguration(ctx context.Context) (*EdgegapManagerConfigu
 		ApiUrl:                 url,
 		ApiToken:               token,
 		Application:            app,
-		Version:                version,
-		DynamicVersioning:      dynamicVersioning,
+		InitialVersion:         initialVersion,
 		PortName:               portName,
 		NakamaAccessUrl:        nakamaAccessUrl,
 		PollingInterval:        pollingInterval,
@@ -138,9 +125,7 @@ func (emc *EdgegapManagerConfiguration) Validate() error {
 		errs = append(errs, errors.New("edgegap application must be set"))
 	}
 
-	if emc.Version == "" {
-		errs = append(errs, errors.New("edgegap application version must be set"))
-	}
+	// Initial version is optional - only used when no version exists in storage
 
 	if emc.PortName == "" {
 		errs = append(errs, errors.New("edgegap application port name must be set"))
@@ -162,19 +147,14 @@ func (emc *EdgegapManagerConfiguration) Validate() error {
 		errs = append(errs, errors.New("invalid reservation max duration: "+emc.ReservationMaxDuration))
 	}
 
-	// For static versioning, validate the version at startup
-	// For dynamic versioning, validation happens when setting the version via update_edgegap_version RPC
-	if !emc.DynamicVersioning {
-		// Check with Edgegap if App Version Exists while testing the Token and the URL of the API
-		apiHelper := helpers.NewAPIClient(emc.ApiUrl, emc.ApiToken)
-		reply, err := apiHelper.Get(fmt.Sprintf("/v1/app/%s/version/%s", emc.Application, emc.Version))
-		if err != nil {
-			errs = append(errs, errors.New(fmt.Sprintf("Failed to get version from Edgegap API, this can happens if the URL is wrong: %s", err.Error())))
-		}
-
-		if reply != nil && reply.StatusCode != http.StatusOK {
-			errs = append(errs, errors.New(fmt.Sprintf("Failed to validate version from Edgegap API, check token and if the Application/Version combo exists - Status Code=%s", reply.Status)))
-		}
+	// Validate Edgegap API connection
+	apiHelper := helpers.NewAPIClient(emc.ApiUrl, emc.ApiToken)
+	// Test API connection by checking the application exists
+	reply, err := apiHelper.Get(fmt.Sprintf("/v1/app/%s", emc.Application))
+	if err != nil {
+		errs = append(errs, errors.New(fmt.Sprintf("Failed to connect to Edgegap API, check URL: %s", err.Error())))
+	} else if reply != nil && reply.StatusCode != http.StatusOK {
+		errs = append(errs, errors.New(fmt.Sprintf("Failed to validate application with Edgegap API, check token and application name - Status Code=%s", reply.Status)))
 	}
 
 	if len(errs) > 0 {

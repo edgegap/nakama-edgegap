@@ -12,6 +12,8 @@ import (
 const (
 	StorageEdgegapIndex               = "_edgegap_instances_idx"
 	StorageEdgegapInstancesCollection = "_edgegap_instances"
+	StorageCollectionEdgegapVersion  = "system"
+	StorageKeyEdgegapVersion         = "edgegap_version"
 )
 
 // Constants representing different statuses of an Edgegap instance
@@ -28,6 +30,14 @@ const (
 type StorageManager struct {
 	nk     runtime.NakamaModule
 	logger runtime.Logger
+}
+
+// NewStorageManager creates a new StorageManager instance
+func NewStorageManager(nk runtime.NakamaModule, logger runtime.Logger) *StorageManager {
+	return &StorageManager{
+		nk:     nk,
+		logger: logger,
+	}
 }
 
 // ExtractEdgegapInstance extracts Edgegap-related data from an instance's metadata.
@@ -92,6 +102,69 @@ func (sm *StorageManager) GetAvailableSeat(instance *runtime.InstanceInfo) (int,
 
 	// Return -1 if maxPlayers is not set
 	return -1, nil
+}
+
+// WriteEdgegapVersion stores the Edgegap version in storage
+func (sm *StorageManager) WriteEdgegapVersion(ctx context.Context, version string) error {
+	versionData := map[string]interface{}{
+		"version":    version,
+		"updated_at": time.Now().Unix(),
+	}
+
+	versionDataBytes, err := json.Marshal(versionData)
+	if err != nil {
+		return err
+	}
+
+	if _, err := sm.nk.StorageWrite(ctx, []*runtime.StorageWrite{
+		{
+			Collection:      StorageCollectionEdgegapVersion,
+			Key:             StorageKeyEdgegapVersion,
+			Value:           string(versionDataBytes),
+			PermissionRead:  2, // Public read
+			PermissionWrite: 0, // No write from clients
+		},
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ReadEdgegapVersion retrieves the Edgegap version from storage
+func (sm *StorageManager) ReadEdgegapVersion(ctx context.Context) (string, int64, error) {
+	objects, err := sm.nk.StorageRead(ctx, []*runtime.StorageRead{
+		{
+			Collection: StorageCollectionEdgegapVersion,
+			Key:        StorageKeyEdgegapVersion,
+		},
+	})
+	
+	if err != nil {
+		return "", 0, err
+	}
+	
+	if len(objects) == 0 {
+		return "", 0, errors.New("no Edgegap version found in storage")
+	}
+	
+	// Parse stored version
+	var storedData map[string]interface{}
+	if err := json.Unmarshal([]byte(objects[0].Value), &storedData); err != nil {
+		return "", 0, err
+	}
+	
+	version, ok := storedData["version"].(string)
+	if !ok || version == "" {
+		return "", 0, errors.New("invalid Edgegap version format in storage")
+	}
+	
+	var updatedAt int64
+	if timestamp, ok := storedData["updated_at"].(float64); ok {
+		updatedAt = int64(timestamp)
+	}
+	
+	return version, updatedAt, nil
 }
 
 // createDbInstance creates and stores a new instance in the database.

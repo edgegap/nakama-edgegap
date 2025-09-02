@@ -32,13 +32,10 @@ type EdgegapFleetManager struct {
 // NewEdgegapFleetManager initializes a new fleet manager instance with dependencies.
 func NewEdgegapFleetManager(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, initializer runtime.Initializer) (*EdgegapFleetManager, error) {
 	// Initialize Storage Manager
-	sm := &StorageManager{
-		nk:     nk,
-		logger: logger,
-	}
+	sm := NewStorageManager(nk, logger)
 
 	// Initialize Edgegap Manager
-	em, err := NewEdgegapManager(ctx, logger, initializer, sm, nk)
+	em, err := NewEdgegapManager(ctx, logger, initializer, sm)
 	if err != nil {
 		return nil, err
 	}
