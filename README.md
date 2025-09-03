@@ -24,7 +24,7 @@ You must set up the following Environment Variable inside your Nakama's cluster:
 EDGEGAP_API_URL=https://api.edgegap.com
 EDGEGAP_API_TOKEN=<The Edgegap's API Token (keep the 'token' in the API Token)>
 EDGEGAP_APPLICATION=<The Edgegap's Application Name to use to deploy>
-EDGEGAP_VERSION=<The Edgegap's Version Name to use to deploy>
+INITIAL_EDGEGAP_VERSION=<Initial version to use when no version exists in storage>
 EDGEGAP_PORT_NAME=<The Edgegap's Application Port Name to send to game client>
 NAKAMA_ACCESS_URL=<Nakama API Url, for Heroic Cloud, it will be provided when you create your instance>
 ```
@@ -39,6 +39,64 @@ EDGEGAP_POLLING_INTERVAL=<Interval where Nakama will sync with Edgegap API in ca
 NAKAMA_CLEANUP_INTERVAL=<Interval where Nakama will check reservations expiration (default:1m )
 NAKAMA_RESERVATION_MAX_DURATION=<Max Duration of a reservations before it expires (default:30s )
 ```
+
+### Version Management
+
+The plugin stores deployment versions in Nakama's storage, allowing you to update the Edgegap deployment version at runtime without restarting services. The version can be updated via Server-to-Server (S2S) RPCs.
+
+On startup, if no version exists in storage and `INITIAL_EDGEGAP_VERSION` is set, the plugin will automatically store this initial version for immediate use
+
+#### Update Version (S2S only)
+Updates the Edgegap deployment version after validating it exists in the Edgegap application.
+
+```bash
+curl -X POST http://localhost:7350/v2/rpc/update_edgegap_version?http_key=<http-key>&unwrap \
+  -H "Content-Type: application/json" \
+  -d '{"version": "your-version-here"}'
+```
+
+Success Response:
+```json
+{
+  "success": true,
+  "version": "your-version-here",
+  "message": "Edgegap version updated successfully. Will be used for new deployments immediately."
+}
+```
+
+Error Response (invalid version):
+```json
+{
+  "code": 5,
+  "message": "version 'invalid-version' does not exist for application 'YourApp'"
+}
+```
+
+#### Get Current Version (S2S only)
+```bash
+curl -X POST http://localhost:7350/v2/rpc/get_edgegap_version?http_key=<http-key>&unwrap \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+Response:
+```json
+{
+  "version": "your-version-here",
+  "source": "dynamic",
+  "updated_at": 1735844393
+}
+```
+
+Response (no version set):
+```json
+{
+  "error": "No Edgegap version configured",
+  "message": "Please set version using update_edgegap_version RPC"
+}
+```
+
+**Note**: Both RPCs require HTTP key authentication and cannot be called by game clients.
 
 Using the Nakama's Storage Index and basic struct Instance Info,
 we store extra information in the metadata for Edgegap using 2 list.
@@ -315,6 +373,25 @@ if err != nil {
     return err
 }
 ```
+
+## Testing
+
+### Test Scripts
+The `scripts/windows/` directory contains Windows batch scripts for testing the version management feature locally.
+
+Quick start:
+```bash
+# Start the environment
+docker compose up -d
+
+# Get current version
+./scripts/windows/test_get_version.bat
+
+# Update version
+./scripts/windows/test_update_version.bat "v1.0.0"
+```
+
+See [scripts/README.md](scripts/README.md) for detailed usage instructions.
 
 ## Support and Troubleshooting
 

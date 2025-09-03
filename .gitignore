@@ -57,3 +57,5 @@ go.work.sum
 # Nakama's local file
 local.yml
 
+# Claude AI configuration
+.claude/
