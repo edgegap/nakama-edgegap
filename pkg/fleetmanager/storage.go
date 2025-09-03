@@ -8,6 +8,9 @@ import (
 	"time"
 )
 
+// ErrorNoVersionFound is returned when no Edgegap version is found in storage
+var ErrorNoVersionFound = errors.New("no Edgegap version found in storage")
+
 // Constants for storage collection and index names
 const (
 	StorageEdgegapIndex               = "_edgegap_instances_idx"
@@ -145,7 +148,7 @@ func (sm *StorageManager) ReadEdgegapVersion(ctx context.Context) (string, int64
 	}
 	
 	if len(objects) == 0 {
-		return "", 0, errors.New("no Edgegap version found in storage")
+		return "", 0, ErrorNoVersionFound
 	}
 	
 	// Parse stored version

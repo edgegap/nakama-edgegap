@@ -42,9 +42,9 @@ NAKAMA_RESERVATION_MAX_DURATION=<Max Duration of a reservations before it expire
 
 ### Version Management
 
-The plugin uses dynamic versioning, allowing you to update the Edgegap deployment version at runtime without restarting services. The version is stored in Nakama's storage and can be updated via Server-to-Server (S2S) RPCs.
+The plugin stores deployment versions in Nakama's storage, allowing you to update the Edgegap deployment version at runtime without restarting services. The version can be updated via Server-to-Server (S2S) RPCs.
 
-On first startup, if no version exists in storage, the plugin will use the `INITIAL_EDGEGAP_VERSION` environment variable as the starting version
+On startup, if no version exists in storage and `INITIAL_EDGEGAP_VERSION` is set, the plugin will automatically store this initial version for immediate use
 
 #### Update Version (S2S only)
 Updates the Edgegap deployment version after validating it exists in the Edgegap application.

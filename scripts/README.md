@@ -24,10 +24,9 @@ Gets the current Edgegap version configuration from Nakama storage.
 ./scripts/test_get_version.bat "mykey123" "http://localhost:7350"
 ```
 
-**Response when dynamic versioning is enabled:**
+**Response when version is configured:**
 ```json
 {
-  "dynamic_versioning": true,
   "version": "your-version",
   "source": "storage",
   "updated_at": 1756414933
@@ -37,14 +36,13 @@ Gets the current Edgegap version configuration from Nakama storage.
 **Response when no version is set:**
 ```json
 {
-  "dynamic_versioning": true,
   "error": "No Edgegap version configured",
   "message": "Please set version using update_edgegap_version RPC"
 }
 ```
 
 ### test_update_version.bat
-Updates the Edgegap deployment version in Nakama storage (requires dynamic versioning to be enabled).
+Updates the Edgegap deployment version in Nakama storage.
 
 ```bash
 # Usage
@@ -75,13 +73,11 @@ Make sure your `local.yml` has:
 ```yaml
 runtime:
   http_key: "testkey123"
-  env:
-    - "EDGEGAP_DYNAMIC_VERSIONING=true"
 ```
 
 ## Notes
 
-- These scripts require dynamic versioning to be enabled (`EDGEGAP_DYNAMIC_VERSIONING=true`)
 - The version format is flexible - Edgegap accepts any string as version
 - Updates take effect immediately for new deployments
 - The HTTP key must match what's configured in Nakama's `runtime.http_key` setting
+- Versions are stored in Nakama storage and persist across restarts
