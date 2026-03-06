@@ -17,7 +17,7 @@ import (
 const (
 	// Error messages
 	ErrorMessageNoVersionFound = "no Edgegap version found - please set version using update_edgegap_version RPC or provide INITIAL_EDGEGAP_VERSION"
-	
+
 	// Log messages
 	LogMessageUsingVersionFromStorage = "Using Edgegap version from storage: %s"
 )
@@ -37,6 +37,7 @@ func NewEdgegapManager(ctx context.Context, logger runtime.Logger, initializer r
 	// Get the Configuration from Environment Variables
 	configuration, err := NewEdgegapManagerConfiguration(ctx)
 	if err != nil {
+		logger.WithField("error", err).Error("edgegap manager configuration invalid")
 		return nil, err
 	}
 
@@ -211,7 +212,7 @@ func (em *EdgegapManager) StopDeployment(requestID string) (*EdgegapApiMessage, 
 }
 
 // ListAllDeployments retrieves all deployment summaries from the Edgegap API by paginating until no more pages exist.
-func (em *EdgegapManager) ListAllDeployments() ([]EdgegapDeploymentSummary, error) {
+func (em *EdgegapManager) ListAllDeployments(nk runtime.NakamaModule) ([]EdgegapDeploymentSummary, error) {
 	var allDeployments []EdgegapDeploymentSummary
 	page := 1
 
@@ -246,6 +247,8 @@ func (em *EdgegapManager) ListAllDeployments() ([]EdgegapDeploymentSummary, erro
 
 		page = response.Pagination.NextPageNumber
 	}
+
+	nk.MetricsGaugeSet("edgegap_deployment_count", nil, float64(len(allDeployments)))
 
 	return allDeployments, nil
 }

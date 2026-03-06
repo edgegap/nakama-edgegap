@@ -227,7 +227,7 @@ func (efm *EdgegapFleetManager) Delete(ctx context.Context, id string) error {
 
 func (efm *EdgegapFleetManager) syncInstancesWorker() {
 	deleteTerminatedInstancesFn := func() {
-		deployments, err := efm.edgegapManager.ListAllDeployments()
+		deployments, err := efm.edgegapManager.ListAllDeployments(efm.nk)
 		if err != nil {
 			efm.logger.WithField("error", err.Error()).Error("failed to list edgegap deployments")
 			return

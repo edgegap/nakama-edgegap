@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/edgegap/nakama-edgegap/internal/helpers"
-	"github.com/heroiclabs/nakama-common/runtime"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/edgegap/nakama-edgegap/internal/helpers"
+	"github.com/heroiclabs/nakama-common/runtime"
 )
 
 type EdgegapManagerConfiguration struct {
@@ -53,7 +54,7 @@ func NewEdgegapManagerConfiguration(ctx context.Context) (*EdgegapManagerConfigu
 
 	// Get initial version (optional, used when no version exists in storage)
 	initialVersion := env["INITIAL_EDGEGAP_VERSION"]
-	
+
 	// For backward compatibility, check EDGEGAP_VERSION if INITIAL_EDGEGAP_VERSION is not set
 	if initialVersion == "" {
 		initialVersion = env["EDGEGAP_VERSION"]
@@ -99,7 +100,7 @@ func NewEdgegapManagerConfiguration(ctx context.Context) (*EdgegapManagerConfigu
 
 	err := mc.Validate()
 	if err != nil {
-		return nil, runtime.NewError(err.Error(), 3)
+		return nil, err
 	}
 
 	return &mc, nil
