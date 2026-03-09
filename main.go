@@ -15,7 +15,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 	// Register the Fleet Manager
 	efm, err := fleetmanager.NewEdgegapFleetManager(ctx, logger, db, nk, initializer)
 	if err != nil {
-		logger.WithField("error", err).Error("failed to create Edgegap fleet manager: %v", err)
+		logger.WithField("error", err).Error("failed to create Edgegap fleet manager")
 		return err
 	}
 

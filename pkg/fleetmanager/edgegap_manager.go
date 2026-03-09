@@ -212,7 +212,7 @@ func (em *EdgegapManager) StopDeployment(requestID string) (*EdgegapApiMessage, 
 }
 
 // ListAllDeployments retrieves all deployment summaries from the Edgegap API by paginating until no more pages exist.
-func (em *EdgegapManager) ListAllDeployments(nk runtime.NakamaModule) ([]EdgegapDeploymentSummary, error) {
+func (em *EdgegapManager) ListAllDeployments() ([]EdgegapDeploymentSummary, error) {
 	var allDeployments []EdgegapDeploymentSummary
 	page := 1
 
@@ -247,8 +247,6 @@ func (em *EdgegapManager) ListAllDeployments(nk runtime.NakamaModule) ([]Edgegap
 
 		page = response.Pagination.NextPageNumber
 	}
-
-	nk.MetricsGaugeSet("edgegap_deployment_count", nil, float64(len(allDeployments)))
 
 	return allDeployments, nil
 }

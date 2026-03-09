@@ -6,10 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/edgegap/nakama-edgegap/internal/helpers"
-	"github.com/heroiclabs/nakama-common/runtime"
 	"sync"
 	"time"
+
+	"github.com/edgegap/nakama-edgegap/internal/helpers"
+	"github.com/heroiclabs/nakama-common/runtime"
 )
 
 var (
@@ -227,12 +228,13 @@ func (efm *EdgegapFleetManager) Delete(ctx context.Context, id string) error {
 
 func (efm *EdgegapFleetManager) syncInstancesWorker() {
 	deleteTerminatedInstancesFn := func() {
-		deployments, err := efm.edgegapManager.ListAllDeployments(efm.nk)
+		deployments, err := efm.edgegapManager.ListAllDeployments()
 		if err != nil {
 			efm.logger.WithField("error", err.Error()).Error("failed to list edgegap deployments")
 			return
 		}
 		efm.logger.WithField("active_deployments", len(deployments)).Debug("fetched active deployment instances list")
+		efm.nk.MetricsGaugeSet("edgegap_deployment_count", nil, float64(len(deployments)))
 
 		dbInstances, err := efm.storageManager.listDbInstances(efm.ctx)
 		if err != nil {
