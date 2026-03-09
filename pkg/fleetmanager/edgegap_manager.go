@@ -17,7 +17,7 @@ import (
 const (
 	// Error messages
 	ErrorMessageNoVersionFound = "no Edgegap version found - please set version using update_edgegap_version RPC or provide INITIAL_EDGEGAP_VERSION"
-	
+
 	// Log messages
 	LogMessageUsingVersionFromStorage = "Using Edgegap version from storage: %s"
 )
@@ -37,6 +37,7 @@ func NewEdgegapManager(ctx context.Context, logger runtime.Logger, initializer r
 	// Get the Configuration from Environment Variables
 	configuration, err := NewEdgegapManagerConfiguration(ctx)
 	if err != nil {
+		logger.WithField("error", err).Error("edgegap manager configuration invalid")
 		return nil, err
 	}
 

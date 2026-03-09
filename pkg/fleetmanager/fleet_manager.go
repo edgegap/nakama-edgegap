@@ -6,10 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/edgegap/nakama-edgegap/internal/helpers"
-	"github.com/heroiclabs/nakama-common/runtime"
 	"sync"
 	"time"
+
+	"github.com/edgegap/nakama-edgegap/internal/helpers"
+	"github.com/heroiclabs/nakama-common/runtime"
 )
 
 var (
@@ -233,6 +234,7 @@ func (efm *EdgegapFleetManager) syncInstancesWorker() {
 			return
 		}
 		efm.logger.WithField("active_deployments", len(deployments)).Debug("fetched active deployment instances list")
+		efm.nk.MetricsGaugeSet("edgegap_deployment_count", nil, float64(len(deployments)))
 
 		dbInstances, err := efm.storageManager.listDbInstances(efm.ctx)
 		if err != nil {
