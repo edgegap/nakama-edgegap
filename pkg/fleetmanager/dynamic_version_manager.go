@@ -6,30 +6,31 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	
+
+	"net/http"
+
 	"github.com/edgegap/nakama-edgegap/internal/helpers"
 	"github.com/heroiclabs/nakama-common/runtime"
-	"net/http"
 )
 
 const (
 	RpcIdUpdateEdgegapVersion = "update_edgegap_version"
 	RpcIdGetEdgegapVersion    = "get_edgegap_version"
-	
+
 	// Error messages
-	ErrorMessageUnauthorized = "unauthorized: this RPC requires server authentication"
+	ErrorMessageUnauthorized        = "unauthorized: this RPC requires server authentication"
 	ErrorMessageNoVersionConfigured = "No Edgegap version configured"
-	ErrorMessageSetVersionRPC = "Please set version using update_edgegap_version RPC"
-	
+	ErrorMessageSetVersionRPC       = "Please set version using update_edgegap_version RPC"
+
 	// Log messages
 	LogMessageStoringInitialVersion = "No version found in storage, storing initial version: %s"
-	LogMessageFailedStoreInitial = "Failed to store initial version during startup: %v"
-	LogMessageFailedCheckVersion = "Failed to check for existing version during startup: %v"
-	LogMessageVersionUpdated = "Edgegap version updated to: %s"
-	LogMessageClientAttemptedS2S = "Client attempted to call server-to-server RPC"
-	
+	LogMessageFailedStoreInitial    = "Failed to store initial version during startup: %v"
+	LogMessageFailedCheckVersion    = "Failed to check for existing version during startup: %v"
+	LogMessageVersionUpdated        = "Edgegap version updated to: %s"
+	LogMessageClientAttemptedS2S    = "Client attempted to call server-to-server RPC"
+
 	// Response fields
-	ResponseFieldSource = "source"
+	ResponseFieldSource   = "source"
 	ResponseSourceDynamic = "dynamic"
 )
 
@@ -51,7 +52,7 @@ func NewDynamicVersionManager(config *EdgegapManagerConfiguration, sm *StorageMa
 		sm:     sm,
 		logger: logger,
 	}
-	
+
 	// Check if initial version should be stored at startup
 	if config.InitialVersion != "" {
 		ctx := context.Background()
@@ -69,7 +70,7 @@ func NewDynamicVersionManager(config *EdgegapManagerConfiguration, sm *StorageMa
 			}
 		}
 	}
-	
+
 	return dvm
 }
 
@@ -80,14 +81,14 @@ func (dvm *DynamicVersionManager) ValidateVersionWithEdgegap(version string) err
 	if err != nil {
 		return fmt.Errorf("failed to validate version with Edgegap API: %w", err)
 	}
-	
+
 	if reply.StatusCode != http.StatusOK {
 		if reply.StatusCode == http.StatusNotFound {
 			return runtime.NewError(fmt.Sprintf("version '%s' does not exist for application '%s'", version, dvm.config.Application), 5) // NOT_FOUND
 		}
 		return runtime.NewError(fmt.Sprintf("failed to validate version with Edgegap API, status: %s", reply.Status), 13) // INTERNAL
 	}
-	
+
 	return nil
 }
 
@@ -116,7 +117,6 @@ func (dvm *DynamicVersionManager) UpdateEdgegapVersion(ctx context.Context, logg
 	if request.Version == "" {
 		return "", runtime.NewError("version cannot be empty", 3) // INVALID_ARGUMENT
 	}
-
 
 	// Validate the version exists in Edgegap before storing
 	if err := dvm.ValidateVersionWithEdgegap(request.Version); err != nil {

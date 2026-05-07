@@ -113,7 +113,7 @@ func (efm *EdgegapFleetManager) Create(ctx context.Context, maxPlayers int, user
 
 	// Validate Edgegap response
 	if deployment.RequestId == "" {
-		efm.logger.WithField("error", deployment.Message).Error("Failed to create Edgegap instance: %s", deployment.Message)
+		efm.logger.Error("Failed to create Edgegap instance: empty request_id in response")
 		efm.callbackHandler.InvokeCallback(callbackId, runtime.CreateError, nil, nil, nil, errors.New("error while creating Edgegap Deployment"))
 		return errors.New("failed to create deployment")
 	}
@@ -244,7 +244,9 @@ func (efm *EdgegapFleetManager) syncInstancesWorker() {
 
 		activeInstancesMap := make(map[string]struct{}, len(deployments))
 		for _, i := range deployments {
-			activeInstancesMap[i.RequestId] = struct{}{}
+			if i.Status != DeploymentStatusError {
+				activeInstancesMap[i.RequestId] = struct{}{}
+			}
 		}
 
 		instancesToRemove := make([]string, 0)

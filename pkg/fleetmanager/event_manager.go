@@ -5,16 +5,19 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"github.com/edgegap/nakama-edgegap/internal/helpers"
-	"github.com/heroiclabs/nakama-common/runtime"
 	"strings"
 	"time"
+
+	"github.com/edgegap/nakama-edgegap/internal/helpers"
+	"github.com/heroiclabs/nakama-common/runtime"
 )
 
 const (
-	RpcIdEventDeployment = "edgegap_deployment"
-	RpcIdEventConnection = "edgegap_connection"
-	RpcIdEventInstance   = "edgegap_instance"
+	RpcIdEventDeploymentReady      = "edgegap_deployment_ready"
+	RpcIdEventDeploymentError      = "edgegap_deployment_error"
+	RpcIdEventDeploymentTerminated = "edgegap_deployment_terminated"
+	RpcIdEventConnection           = "edgegap_connection"
+	RpcIdEventInstance             = "edgegap_instance"
 )
 
 var (
@@ -53,10 +56,7 @@ func (eem *EdgegapEventManager) unpack(ctx context.Context, payload string) (*Ev
 	}, nil
 }
 
-// handleDeploymentEvent processes deployment-related events.
-// It extracts the payload, updates the instance session status, and logs errors if necessary.
-func (eem *EdgegapEventManager) handleDeploymentEvent(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
-	logger.Info("Handle Deployment")
+func (eem *EdgegapEventManager) handleDeploymentReadyEvent(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	msg, err := eem.unpack(ctx, payload)
 	if err != nil {
 		return "", err
@@ -75,40 +75,72 @@ func (eem *EdgegapEventManager) handleDeploymentEvent(ctx context.Context, logge
 		return "", errors.New("no instance found with requestId " + deployment.RequestId)
 	}
 
-	badState := true
-
-	switch deployment.CurrentStatus {
-	case DeploymentStatusReady:
-		logger.Info("Edgegap deployment ready #%s", deployment.RequestId)
-		instance.Status = EdgegapStatusRunning
-		instance.ConnectionInfo = &runtime.ConnectionInfo{
-			IpAddress: deployment.PublicIp,
-			DnsName:   deployment.Fqdn,
-			Port:      deployment.Ports[eem.config.PortName].External,
-		}
-		badState = false
-	case DeploymentStatusError:
-		logger.Warn("Edgegap deployment error #%s : %s", deployment.RequestId, deployment.Error)
-		instance.Status = EdgegapStatusError
-	default:
-		logger.Error("Unknown deployment status %s", deployment.CurrentStatus)
-		instance.Status = EdgegapStatusUnknown
+	logger.Info("Edgegap deployment ready #%s", deployment.RequestId)
+	instance.Status = EdgegapStatusRunning
+	instance.ConnectionInfo = &runtime.ConnectionInfo{
+		IpAddress: deployment.PublicIp,
+		DnsName:   deployment.Fqdn,
+		Port:      deployment.Ports[eem.config.PortName].External,
 	}
 
-	if badState {
-		ei, err := eem.sm.ExtractEdgegapInstance(instance)
-		if err != nil {
-			return "", err
-		}
-		fmInstance.callbackHandler.InvokeCallback(ei.CallbackId, runtime.CreateError, nil, nil, nil, errors.New("an error occurred with edgegap deployment"))
-	}
+	return "ok", eem.sm.updateDbInstance(ctx, instance)
+}
 
-	err = eem.sm.updateDbInstance(ctx, instance)
+func (eem *EdgegapEventManager) handleDeploymentErrorEvent(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	msg, err := eem.unpack(ctx, payload)
 	if err != nil {
 		return "", err
 	}
 
-	return "ok", nil
+	var deployment EdgegapDeploymentStatus
+	if err := json.Unmarshal([]byte(msg.payload), &deployment); err != nil {
+		return "", err
+	}
+
+	instance, err := eem.sm.getDbInstance(ctx, deployment.RequestId)
+	if err != nil {
+		return "", err
+	}
+	if instance == nil {
+		return "", errors.New("no instance found with requestId " + deployment.RequestId)
+	}
+
+	logger.Warn("Edgegap deployment error #%s : %s", deployment.RequestId, deployment.Error)
+	instance.Status = EdgegapStatusError
+
+	ei, err := eem.sm.ExtractEdgegapInstance(instance)
+	if err != nil {
+		logger.Error("failed to extract edgegap instance for error callback #%s: %v", deployment.RequestId, err)
+		return "", err
+	}
+	fmInstance.callbackHandler.InvokeCallback(ei.CallbackId, runtime.CreateError, nil, nil, nil, errors.New("an error occurred with edgegap deployment"))
+
+	return "ok", eem.sm.updateDbInstance(ctx, instance)
+}
+
+func (eem *EdgegapEventManager) handleDeploymentTerminatedEvent(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+	msg, err := eem.unpack(ctx, payload)
+	if err != nil {
+		return "", err
+	}
+
+	var deployment EdgegapDeploymentStatus
+	if err := json.Unmarshal([]byte(msg.payload), &deployment); err != nil {
+		return "", err
+	}
+
+	instance, err := eem.sm.getDbInstance(ctx, deployment.RequestId)
+	if err != nil {
+		return "", err
+	}
+	if instance == nil {
+		return "", errors.New("no instance found with requestId " + deployment.RequestId)
+	}
+
+	logger.Info("Edgegap deployment terminated #%s", deployment.RequestId)
+	instance.Status = EdgegapStatusTerminated
+
+	return "ok", eem.sm.updateDbInstance(ctx, instance)
 }
 
 // handleConnectionEvent processes connection-related events.
