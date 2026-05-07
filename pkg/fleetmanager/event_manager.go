@@ -176,6 +176,7 @@ func (eem *EdgegapEventManager) handleInstanceEvent(ctx context.Context, logger 
 	}
 
 	stopping := false
+	readyCallbackId := ""
 
 	switch strings.ToUpper(instanceEvent.Action) {
 	case InstanceEventStateReady:
@@ -189,7 +190,7 @@ func (eem *EdgegapEventManager) handleInstanceEvent(ctx context.Context, logger 
 		if err != nil {
 			return "", err
 		}
-		fmInstance.callbackHandler.InvokeCallback(ei.CallbackId, runtime.CreateSuccess, instance, nil, nil, nil)
+		readyCallbackId = ei.CallbackId
 
 	case InstanceEventStateStop:
 		logger.Info("Edgegap instance stop #%s: %s", instanceEvent.InstanceId, instanceEvent.Message)
@@ -208,6 +209,14 @@ func (eem *EdgegapEventManager) handleInstanceEvent(ctx context.Context, logger 
 	err = eem.sm.updateDbInstance(ctx, instance)
 	if err != nil {
 		return "", err
+	}
+
+	// Invoke the ready callback only after the updated instance (including the
+	// merged game_server metadata) is persisted. Otherwise clients notified by
+	// the callback may query instance_list and read a stale record that is
+	// still missing the game_server fields, causing empty connection info.
+	if readyCallbackId != "" {
+		fmInstance.callbackHandler.InvokeCallback(readyCallbackId, runtime.CreateSuccess, instance, nil, nil, nil)
 	}
 
 	if stopping {
