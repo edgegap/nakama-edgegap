@@ -150,10 +150,17 @@ func (em *EdgegapManager) getDeploymentCreation(usersIP []string, metadata map[s
 		return nil, err
 	}
 
-	// Get the Edgegap version from storage or initial version
-	version, err := em.getEdgegapVersion()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get Edgegap version: %w", err)
+	// Use per-deployment version override from metadata if provided,
+	// otherwise fall back to the global version from storage.
+	var version string
+	if v, ok := metadata["edgegap_version"].(string); ok && v != "" {
+		version = v
+		em.logger.Debug("Using per-deployment Edgegap version from metadata: %s", version)
+	} else {
+		version, err = em.getEdgegapVersion()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get Edgegap version: %w", err)
+		}
 	}
 
 	// Construct deployment request payload
