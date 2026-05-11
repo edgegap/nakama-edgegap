@@ -58,13 +58,15 @@ func NewEdgegapManager(ctx context.Context, logger runtime.Logger, initializer r
 
 	// Register RPC functions for handling various events
 	rpcToRegisters := map[string]func(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error){
-		RpcIdEventDeployment:       eem.handleDeploymentEvent,
-		RpcIdEventConnection:       eem.handleConnectionEvent,
-		RpcIdEventInstance:         eem.handleInstanceEvent,
-		RpcIdInstanceSessionCreate: createInstanceSession,
-		RpcIdInstanceSessionGet:    getInstanceSession,
-		RpcIdInstanceSessionJoin:   joinInstanceSession,
-		RpcIdInstanceSessionList:   listInstanceSession,
+		RpcIdEventDeploymentReady:      eem.handleDeploymentReadyEvent,
+		RpcIdEventDeploymentError:      eem.handleDeploymentErrorEvent,
+		RpcIdEventDeploymentTerminated: eem.handleDeploymentTerminatedEvent,
+		RpcIdEventConnection:           eem.handleConnectionEvent,
+		RpcIdEventInstance:             eem.handleInstanceEvent,
+		RpcIdInstanceSessionCreate:     createInstanceSession,
+		RpcIdInstanceSessionGet:        getInstanceSession,
+		RpcIdInstanceSessionJoin:       joinInstanceSession,
+		RpcIdInstanceSessionList:       listInstanceSession,
 		// S2S RPCs for managing Edgegap version
 		RpcIdUpdateEdgegapVersion: dvm.UpdateEdgegapVersion,
 		RpcIdGetEdgegapVersion:    dvm.GetEdgegapVersion,
@@ -93,7 +95,7 @@ func (em *EdgegapManager) getFormattedUrl(path string) string {
 }
 
 // CreateDeployment initiates a new deployment on Edgegap using the given users' IP addresses and metadata.
-func (em *EdgegapManager) CreateDeployment(usersIP []string, metadata map[string]any) (*EdgegapBetaDeployment, error) {
+func (em *EdgegapManager) CreateDeployment(usersIP []string, metadata map[string]any) (*EdgegapDeploymentResponse, error) {
 	// Prepare deployment data
 	deployment, err := em.getDeploymentCreation(usersIP, metadata)
 	if err != nil {
@@ -101,7 +103,7 @@ func (em *EdgegapManager) CreateDeployment(usersIP []string, metadata map[string
 	}
 
 	// Send deployment request to Edgegap API
-	reply, err := em.apiHelper.Post("/beta/deployments", deployment)
+	reply, err := em.apiHelper.Post("/v2/deployments", deployment)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +115,7 @@ func (em *EdgegapManager) CreateDeployment(usersIP []string, metadata map[string
 		if err != nil {
 			return nil, err
 		}
-		var msg EdgegapBetaDeployment
+		var msg EdgegapDeploymentResponse
 		err = json.Unmarshal(body, &msg)
 		if err != nil {
 			return nil, err
@@ -127,7 +129,7 @@ func (em *EdgegapManager) CreateDeployment(usersIP []string, metadata map[string
 		return nil, err
 	}
 
-	var response EdgegapBetaDeployment
+	var response EdgegapDeploymentResponse
 	err = json.Unmarshal(body, &response)
 
 	return &response, err
@@ -140,7 +142,8 @@ func (em *EdgegapManager) getDeploymentCreation(usersIP []string, metadata map[s
 	// Convert user IPs into EdgegapDeploymentUser objects
 	for _, ip := range usersIP {
 		users = append(users, EdgegapDeploymentUser{
-			IpAddress: ip,
+			UserType: "ip_address",
+			UserData: EdgegapUserData{IpAddress: ip},
 		})
 	}
 
@@ -165,9 +168,9 @@ func (em *EdgegapManager) getDeploymentCreation(usersIP []string, metadata map[s
 
 	// Construct deployment request payload
 	return &EdgegapDeploymentCreation{
-		ApplicationName: em.configuration.Application,
-		Version:         version,
-		Users:           users,
+		Application: em.configuration.Application,
+		Version:     version,
+		Users:       users,
 		EnvironmentVariables: []EdgegapEnvironmentVariable{
 			{
 				Key:      "NAKAMA_CONNECTION_EVENT_URL",
@@ -188,9 +191,9 @@ func (em *EdgegapManager) getDeploymentCreation(usersIP []string, metadata map[s
 		Tags: []string{
 			"nakama",
 		},
-		Webhook: EdgegapWebhook{
-			Url: em.getFormattedUrl(RpcIdEventDeployment),
-		},
+		WebhookOnReady:      EdgegapWebhook{Url: em.getFormattedUrl(RpcIdEventDeploymentReady)},
+		WebhookOnError:      EdgegapWebhook{Url: em.getFormattedUrl(RpcIdEventDeploymentError)},
+		WebhookOnTerminated: EdgegapWebhook{Url: em.getFormattedUrl(RpcIdEventDeploymentTerminated)},
 	}, nil
 }
 

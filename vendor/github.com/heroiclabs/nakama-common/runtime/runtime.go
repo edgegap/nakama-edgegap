@@ -1078,11 +1078,12 @@ type NakamaModule interface {
 	AuthenticateTokenGenerate(userID, username string, exp int64, vars map[string]string) (string, int64, error)
 
 	AccountGetId(ctx context.Context, userID string) (*api.Account, error)
-	AccountsGetId(ctx context.Context, userIDs []string) ([]*api.Account, error)
+	AccountsGetId(ctx context.Context, userIDs, deviceIDs []string) ([]*api.Account, error)
 	AccountUpdateId(ctx context.Context, userID, username string, metadata map[string]interface{}, displayName, timezone, location, langTag, avatarUrl string) error
 
 	AccountDeleteId(ctx context.Context, userID string, recorded bool) error
 	AccountExportId(ctx context.Context, userID string) (string, error)
+	AccountImportId(ctx context.Context, data, userID string) (*api.Account, error)
 
 	UsersGetId(ctx context.Context, userIDs []string, facebookIDs []string) ([]*api.User, error)
 	UsersGetUsername(ctx context.Context, usernames []string) ([]*api.User, error)
@@ -1353,6 +1354,7 @@ Satori runtime integration definitions.
 */
 type Satori interface {
 	Authenticate(ctx context.Context, id string, defaultProperties, customProperties map[string]string, noSession bool, ipAddress ...string) (*Properties, error)
+	IdentityDelete(ctx context.Context, id string) error
 	PropertiesGet(ctx context.Context, id string) (*Properties, error)
 	PropertiesUpdate(ctx context.Context, id string, properties *PropertiesUpdate) error
 	EventsPublish(ctx context.Context, id string, events []*Event, ipAddress ...string) error

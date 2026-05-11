@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/heroiclabs/nakama-common/runtime"
 	"time"
+
+	"github.com/heroiclabs/nakama-common/runtime"
 )
 
 // ErrorNoVersionFound is returned when no Edgegap version is found in storage
@@ -15,18 +16,19 @@ var ErrorNoVersionFound = errors.New("no Edgegap version found in storage")
 const (
 	StorageEdgegapIndex               = "_edgegap_instances_idx"
 	StorageEdgegapInstancesCollection = "_edgegap_instances"
-	StorageCollectionEdgegapVersion  = "system"
-	StorageKeyEdgegapVersion         = "edgegap_version"
+	StorageCollectionEdgegapVersion   = "system"
+	StorageKeyEdgegapVersion          = "edgegap_version"
 )
 
 // Constants representing different statuses of an Edgegap instance
 const (
-	EdgegapStatusRequested = "REQUESTED"
-	EdgegapStatusRunning   = "RUNNING"
-	EdgegapStatusReady     = "READY"
-	EdgegapStatusStopping  = "STOPPING"
-	EdgegapStatusError     = "ERROR"
-	EdgegapStatusUnknown   = "UNKNOWN"
+	EdgegapStatusRequested  = "REQUESTED"
+	EdgegapStatusRunning    = "RUNNING"
+	EdgegapStatusReady      = "READY"
+	EdgegapStatusStopping   = "STOPPING"
+	EdgegapStatusError      = "ERROR"
+	EdgegapStatusUnknown    = "UNKNOWN"
+	EdgegapStatusTerminated = "TERMINATED"
 )
 
 // StorageManager handles interactions with Nakama's storage system
@@ -142,31 +144,31 @@ func (sm *StorageManager) ReadEdgegapVersion(ctx context.Context) (string, int64
 			Key:        StorageKeyEdgegapVersion,
 		},
 	})
-	
+
 	if err != nil {
 		return "", 0, err
 	}
-	
+
 	if len(objects) == 0 {
 		return "", 0, ErrorNoVersionFound
 	}
-	
+
 	// Parse stored version
 	var storedData map[string]interface{}
 	if err := json.Unmarshal([]byte(objects[0].Value), &storedData); err != nil {
 		return "", 0, err
 	}
-	
+
 	version, ok := storedData["version"].(string)
 	if !ok || version == "" {
 		return "", 0, errors.New("invalid Edgegap version format in storage")
 	}
-	
+
 	var updatedAt int64
 	if timestamp, ok := storedData["updated_at"].(float64); ok {
 		updatedAt = int64(timestamp)
 	}
-	
+
 	return version, updatedAt, nil
 }
 
