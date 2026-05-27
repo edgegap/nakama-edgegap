@@ -92,7 +92,9 @@ func createInstanceSession(ctx context.Context, logger runtime.Logger, db *sql.D
 			}
 			return
 		case runtime.CreateTimeout:
-			logger.WithField("error", createErr.Error()).Error("Failed to create Edgegap instance, timed out")
+			// createErr may be nil even though the framework reports a timeout —
+			// pass the interface value directly so we don't .Error() a nil.
+			logger.WithField("error", createErr).Error("Failed to create Edgegap instance, timed out")
 
 			// Send notification to client that instance session creation timed out
 			for _, userId := range req.UserIds {
@@ -105,7 +107,7 @@ func createInstanceSession(ctx context.Context, logger runtime.Logger, db *sql.D
 				}
 			}
 		default:
-			logger.WithField("error", createErr.Error()).Error("Failed to create Edgegap instance")
+			logger.WithField("error", createErr).Error("Failed to create Edgegap instance")
 
 			// Send notification to client that instance session couldn't be created
 			for _, userId := range req.UserIds {

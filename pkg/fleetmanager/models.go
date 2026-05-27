@@ -2,11 +2,6 @@ package fleetmanager
 
 import "time"
 
-const (
-	DeploymentStatusReady = "Status.READY"
-	DeploymentStatusError = "Status.ERROR"
-)
-
 type EdgegapInstanceInfo struct {
 	MaxPlayers            int       `json:"max_players"`
 	AvailableSeats        int       `json:"available_seats"`
@@ -17,8 +12,13 @@ type EdgegapInstanceInfo struct {
 	Connections           []string  `json:"connections"`
 }
 
-type EdgegapDeploymentUser struct {
+type EdgegapUserData struct {
 	IpAddress string `json:"ip_address"`
+}
+
+type EdgegapDeploymentUser struct {
+	UserType string          `json:"user_type"`
+	UserData EdgegapUserData `json:"user_data"`
 }
 
 type EdgegapEnvironmentVariable struct {
@@ -32,12 +32,14 @@ type EdgegapWebhook struct {
 }
 
 type EdgegapDeploymentCreation struct {
-	ApplicationName      string                       `json:"application_name"`
+	Application          string                       `json:"application"`
 	Version              string                       `json:"version"`
 	Users                []EdgegapDeploymentUser      `json:"users"`
 	EnvironmentVariables []EdgegapEnvironmentVariable `json:"environment_variables"`
 	Tags                 []string                     `json:"tags"`
-	Webhook              EdgegapWebhook               `json:"webhook"`
+	WebhookOnReady       EdgegapWebhook               `json:"webhook_on_ready"`
+	WebhookOnError       EdgegapWebhook               `json:"webhook_on_error"`
+	WebhookOnTerminated  EdgegapWebhook               `json:"webhook_on_terminated"`
 }
 
 type EdgegapDeploymentPort struct {
@@ -59,18 +61,20 @@ type EdgegapDeploymentStatus struct {
 	Ports         map[string]EdgegapDeploymentPort `json:"ports"`
 }
 
-type EdgegapBetaDeployment struct {
+type EdgegapDeploymentResponse struct {
 	RequestId string `json:"request_id"`
-	Message   string `json:"message"`
 }
 
 type EdgegapApiMessage struct {
 	Message string `json:"message"`
 }
 
+const DeploymentStatusError = "Status.ERROR"
+
 type EdgegapDeploymentSummary struct {
 	RequestId string `json:"request_id"`
 	Ready     bool   `json:"ready"`
+	Status    string `json:"status"`
 }
 
 type EdgegapPagination struct {
