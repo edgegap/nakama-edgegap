@@ -115,12 +115,11 @@ func (em *EdgegapManager) CreateDeployment(usersIP []string, metadata map[string
 		if err != nil {
 			return nil, err
 		}
-		var msg EdgegapDeploymentResponse
-		err = json.Unmarshal(body, &msg)
-		if err != nil {
-			return nil, err
+		var msg EdgegapApiMessage
+		if jsonErr := json.Unmarshal(body, &msg); jsonErr != nil || msg.Message == "" {
+			return nil, fmt.Errorf("could not create deployment: status %d, body: %s", reply.StatusCode, string(body))
 		}
-		return &msg, errors.New("could not create deployment")
+		return nil, fmt.Errorf("could not create deployment: status %d: %s", reply.StatusCode, msg.Message)
 	}
 
 	// Parse the response body

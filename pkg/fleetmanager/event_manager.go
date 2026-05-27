@@ -56,6 +56,8 @@ func (eem *EdgegapEventManager) unpack(ctx context.Context, payload string) (*Ev
 	}, nil
 }
 
+// handleDeploymentReadyEvent processes the deployment "ready" webhook from Edgegap.
+// It marks the instance as running and stores the connection info (IP, FQDN, external port).
 func (eem *EdgegapEventManager) handleDeploymentReadyEvent(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	msg, err := eem.unpack(ctx, payload)
 	if err != nil {
@@ -86,6 +88,9 @@ func (eem *EdgegapEventManager) handleDeploymentReadyEvent(ctx context.Context, 
 	return "ok", eem.sm.updateDbInstance(ctx, instance)
 }
 
+// handleDeploymentErrorEvent processes the deployment "error" webhook from Edgegap.
+// It marks the instance as errored and invokes the CreateError callback so the
+// caller that requested the deployment is notified of the failure.
 func (eem *EdgegapEventManager) handleDeploymentErrorEvent(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	msg, err := eem.unpack(ctx, payload)
 	if err != nil {
@@ -105,7 +110,7 @@ func (eem *EdgegapEventManager) handleDeploymentErrorEvent(ctx context.Context, 
 		return "", errors.New("no instance found with requestId " + deployment.RequestId)
 	}
 
-	logger.Warn("Edgegap deployment error #%s : %s", deployment.RequestId, deployment.Error)
+	logger.Warn("Edgegap deployment error #%s : %s", deployment.RequestId, deployment.ErrorDetail)
 	instance.Status = EdgegapStatusError
 
 	ei, err := eem.sm.ExtractEdgegapInstance(instance)
@@ -118,6 +123,8 @@ func (eem *EdgegapEventManager) handleDeploymentErrorEvent(ctx context.Context, 
 	return "ok", eem.sm.updateDbInstance(ctx, instance)
 }
 
+// handleDeploymentTerminatedEvent processes the deployment "terminated" webhook from Edgegap.
+// It marks the instance as terminated so the sync worker can clean it from storage.
 func (eem *EdgegapEventManager) handleDeploymentTerminatedEvent(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	msg, err := eem.unpack(ctx, payload)
 	if err != nil {
