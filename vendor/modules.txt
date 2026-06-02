@@ -1,5 +1,5 @@
-# github.com/heroiclabs/nakama-common v1.45.0
-## explicit; go 1.26.1
+# github.com/heroiclabs/nakama-common v1.46.0
+## explicit; go 1.26.3
 github.com/heroiclabs/nakama-common/api
 github.com/heroiclabs/nakama-common/rtapi
 github.com/heroiclabs/nakama-common/runtime

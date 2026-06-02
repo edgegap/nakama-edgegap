@@ -13,6 +13,10 @@ import (
 	"github.com/heroiclabs/nakama-common/runtime"
 )
 
+const (
+	DeploymentIdKey = "deployment_id"
+)
+
 var (
 	fmInstance *EdgegapFleetManager
 	once       sync.Once
@@ -82,7 +86,7 @@ func (efm *EdgegapFleetManager) Init(nk runtime.NakamaModule, callbackHandler ru
 }
 
 // Create provisions a new Edgegap deployment based on the given players.
-func (efm *EdgegapFleetManager) Create(ctx context.Context, maxPlayers int, userIds []string, latencies []runtime.FleetUserLatencies, metadata map[string]any, callback runtime.FmCreateCallbackFn) error {
+func (efm *EdgegapFleetManager) Create(ctx context.Context, maxPlayers int, userIds []string, latencies []runtime.FleetUserLatencies, metadata map[string]any, callback runtime.FmCreateCallbackFn) (map[string]string, error) {
 	efm.logger.Info("Requesting a new Deployment")
 	callbackId := efm.callbackHandler.GenerateCallbackId()
 	efm.callbackHandler.SetCallback(callbackId, callback)
@@ -91,14 +95,14 @@ func (efm *EdgegapFleetManager) Create(ctx context.Context, maxPlayers int, user
 	userIps, err := efm.storageManager.getUserIPs(ctx, userIds)
 	if err != nil {
 		efm.callbackHandler.InvokeCallback(callbackId, runtime.CreateError, nil, nil, nil, errors.New("unexpected Error while parsing Users Data"))
-		return err
+		return nil, err
 	}
 
 	// Use caller IP if user IPs are unavailable
 	if len(userIps) == 0 {
 		callerIP, ok := ctx.Value(runtime.RUNTIME_CTX_CLIENT_IP).(string)
 		if !ok {
-			return ErrInvalidInput
+			return nil, ErrInvalidInput
 		}
 		userIps = append(userIps, callerIP)
 	}
@@ -108,14 +112,14 @@ func (efm *EdgegapFleetManager) Create(ctx context.Context, maxPlayers int, user
 	if err != nil {
 		efm.logger.WithField("error", err).Error("failed to create Edgegap instance")
 		efm.callbackHandler.InvokeCallback(callbackId, runtime.CreateError, nil, nil, nil, errors.New("error while communicating with Edgegap"))
-		return err
+		return nil, err
 	}
 
 	// Validate Edgegap response
 	if deployment.RequestId == "" {
 		efm.logger.Error("Failed to create Edgegap instance: empty request_id in response")
 		efm.callbackHandler.InvokeCallback(callbackId, runtime.CreateError, nil, nil, nil, errors.New("error while creating Edgegap Deployment"))
-		return errors.New("failed to create deployment")
+		return nil, errors.New("failed to create deployment")
 	}
 
 	// Store the new instance session in the database
@@ -123,10 +127,10 @@ func (efm *EdgegapFleetManager) Create(ctx context.Context, maxPlayers int, user
 	if err != nil {
 		efm.logger.WithField("error", err).Error("failed to create Storage Instance Session")
 		efm.callbackHandler.InvokeCallback(callbackId, runtime.CreateError, nil, nil, nil, errors.New("error while creating Instance Session"))
-		return err
+		return nil, err
 	}
 
-	return nil
+	return map[string]string{DeploymentIdKey: deployment.RequestId}, nil
 }
 
 // Get retrieves an instance session instance by its ID.
@@ -266,13 +270,19 @@ func (efm *EdgegapFleetManager) syncInstancesWorker() {
 		}
 	}
 
-	deleteTerminatedInstancesFn()
-
 	duration, err := time.ParseDuration(efm.edgegapManager.configuration.PollingInterval)
 	if err != nil {
 		efm.logger.WithField("error", err.Error()).Error("failed to parse polling interval, defaulting to 15m")
 		duration = 15 * time.Minute
 	}
+
+	if duration <= 0 {
+		efm.logger.WithField("duration", duration).Info("Skipping polling scheduler: polling_interval set to 0")
+		return
+	}
+
+	deleteTerminatedInstancesFn()
+
 	t := time.NewTicker(duration)
 	efm.logger.Info("Starting Instance Worker for Sync every %s", duration.String())
 	for {
@@ -331,13 +341,19 @@ func (efm *EdgegapFleetManager) runCleanupScheduler() {
 		}
 	}
 
-	cleanupFn()
-
 	duration, err := time.ParseDuration(efm.edgegapManager.configuration.CleanupInterval)
 	if err != nil {
 		efm.logger.WithField("error", err.Error()).Error("failed to parse cleanup interval, defaulting to 30s")
 		duration = 30 * time.Second
 	}
+
+	if duration <= 0 {
+		efm.logger.WithField("duration", duration).Info("Skipping cleanup scheduler: cleanup_interval set to 0")
+		return
+	}
+
+	cleanupFn()
+
 	t := time.NewTicker(duration)
 
 	efm.logger.Info("Starting cleanup scheduler every %s", duration.String())

@@ -48,11 +48,12 @@ type instanceSessionListReply struct {
 }
 
 type instanceCreateReply struct {
-	Message string `json:"message"`
-	Ok      bool   `json:"ok"`
+	DeploymentId string `json:"deployment_id"`
+	Message      string `json:"message"`
+	Ok           bool   `json:"ok"`
 }
 
-// createInstanceSession client rpc to create a instance
+// createInstanceSession client rpc to create an instance
 func createInstanceSession(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 	userId, ok := ctx.Value(runtime.RUNTIME_CTX_USER_ID).(string)
 	if !ok {
@@ -124,11 +125,17 @@ func createInstanceSession(ctx context.Context, logger runtime.Logger, db *sql.D
 	}
 
 	efm := nk.GetFleetManager()
-	err := efm.Create(ctx, req.MaxPlayers, req.UserIds, nil, req.Metadata, callback)
+	metadata, err := efm.Create(ctx, req.MaxPlayers, req.UserIds, nil, req.Metadata, callback)
+	if err != nil {
+		logger.WithField("error", err.Error()).Error("Failed to create Edgegap instance")
+		return "", ErrInternalError
+	}
 
+	deploymentId, _ := metadata[DeploymentIdKey]
 	reply := instanceCreateReply{
-		Message: "Instance Created",
-		Ok:      true,
+		DeploymentId: deploymentId,
+		Message:      "Instance Created",
+		Ok:           true,
 	}
 
 	replyString, err := json.Marshal(reply)

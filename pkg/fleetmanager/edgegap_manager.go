@@ -129,9 +129,11 @@ func (em *EdgegapManager) CreateDeployment(usersIP []string, metadata map[string
 	}
 
 	var response EdgegapDeploymentResponse
-	err = json.Unmarshal(body, &response)
+	if err = json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal deployment response: %w", err)
+	}
 
-	return &response, err
+	return &response, nil
 }
 
 // getDeploymentCreation prepares the deployment payload, including metadata and environment variables.
