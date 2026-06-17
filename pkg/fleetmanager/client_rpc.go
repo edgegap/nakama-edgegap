@@ -131,7 +131,7 @@ func createInstanceSession(ctx context.Context, logger runtime.Logger, db *sql.D
 		return "", ErrInternalError
 	}
 
-	deploymentId, _ := metadata[DeploymentIdKey]
+	deploymentId := metadata[DeploymentIdKey]
 	reply := instanceCreateReply{
 		DeploymentId: deploymentId,
 		Message:      "Instance Created",

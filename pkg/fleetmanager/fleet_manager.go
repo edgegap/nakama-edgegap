@@ -102,7 +102,9 @@ func (efm *EdgegapFleetManager) Create(ctx context.Context, maxPlayers int, user
 	if len(userIps) == 0 {
 		callerIP, ok := ctx.Value(runtime.RUNTIME_CTX_CLIENT_IP).(string)
 		if !ok {
-			return nil, ErrInvalidInput
+			efm.logger.Error("failed to extract client IP from context")
+			efm.callbackHandler.InvokeCallback(callbackId, runtime.CreateError, nil, nil, nil, errors.New("an unexpected error occurred"))
+			return nil, ErrInternalError
 		}
 		userIps = append(userIps, callerIP)
 	}
