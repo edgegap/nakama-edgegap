@@ -40,6 +40,8 @@ NAKAMA_CLEANUP_INTERVAL=<Interval where Nakama will check reservations expiratio
 NAKAMA_RESERVATION_MAX_DURATION=<Max Duration of a reservations before it expires (default:30s )
 ```
 
+If `EDGEGAP_POLLING_INTERVAL` or `NAKAMA_CLEANUP_INTERVAL` are set to empty values or 0, the corresponding background workers are disabled entirely. This can be useful for testing purposes but is not recommended for production setting.
+
 ### Version Management
 
 The plugin stores deployment versions in Nakama's storage, allowing you to update the Edgegap deployment version at runtime without restarting services. The version can be updated via Server-to-Server (S2S) RPCs.
