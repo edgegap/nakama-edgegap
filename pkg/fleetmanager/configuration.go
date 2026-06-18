@@ -81,7 +81,7 @@ func NewEdgegapManagerConfiguration(ctx context.Context) (*EdgegapManagerConfigu
 	if !ok {
 		cleanupInterval = "1m"
 	} else if strings.TrimSpace(cleanupInterval) == "" {
-		pollingInterval = "0"
+		cleanupInterval = "0"
 	}
 
 	reservationMaxDuration, ok := env["NAKAMA_RESERVATION_MAX_DURATION"]

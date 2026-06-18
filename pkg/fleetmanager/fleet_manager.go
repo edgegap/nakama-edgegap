@@ -119,7 +119,7 @@ func (efm *EdgegapFleetManager) Create(ctx context.Context, maxPlayers int, user
 
 	// Validate Edgegap response
 	if deployment.RequestId == "" {
-		efm.logger.Error("Failed to create Edgegap instance: empty request_id in response")
+		efm.logger.Error("failed to create Edgegap instance: empty request_id in response")
 		efm.callbackHandler.InvokeCallback(callbackId, runtime.CreateError, nil, nil, nil, errors.New("error while creating Edgegap Deployment"))
 		return nil, errors.New("failed to create deployment")
 	}
@@ -279,7 +279,7 @@ func (efm *EdgegapFleetManager) syncInstancesWorker() {
 	}
 
 	if duration <= 0 {
-		efm.logger.WithField("duration", duration).Info("Skipping polling scheduler: polling_interval set to 0")
+		efm.logger.WithField("duration", duration).Info("skipping polling scheduler: polling_interval set to 0")
 		return
 	}
 
